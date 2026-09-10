@@ -33,7 +33,13 @@ finally {
 }
 
 $iv = New-Object byte[] 16
-[Security.Cryptography.RandomNumberGenerator]::Fill($iv)
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $rng.GetBytes($iv)
+}
+finally {
+    $rng.Dispose()
+}
 $aes = [Security.Cryptography.Aes]::Create()
 try {
     $aes.Key = $key
@@ -74,4 +80,3 @@ $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash.ToLowerInvari
 [IO.File]::WriteAllText($checksum, $hash + '  plugin-marketplace.aes' + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 Write-Host ('Encrypted invitation package: ' + $output)
 Write-Host ('SHA-256: ' + $hash)
-

@@ -27,18 +27,18 @@ try {
     if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
         $distributionPath = Join-Path $workRoot 'distribution'
         & git clone --depth 1 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git' $distributionPath
-        if ($LASTEXITCODE -ne 0) { throw '无法克隆公开邀请仓库，请检查 GitHub 网络连接。' }
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to clone the public invitation repository. Check GitHub connectivity.' }
         $payloadPath = Join-Path $distributionPath 'payload\plugin-marketplace.aes'
         if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
-            throw '邀请仓库缺少加密插件包。'
+            throw 'The invitation repository does not contain the encrypted plugin package.'
         }
     }
 
     $blob = [IO.File]::ReadAllBytes($payloadPath)
     $magic = [Text.Encoding]::ASCII.GetBytes('MMCMAX1')
-    if ($blob.Length -lt 56) { throw '邀请包损坏或不完整。' }
+    if ($blob.Length -lt 56) { throw 'The invitation package is incomplete or corrupted.' }
     for ($i = 0; $i -lt $magic.Length; $i++) {
-        if ($blob[$i] -ne $magic[$i]) { throw '邀请包格式不受支持。' }
+        if ($blob[$i] -ne $magic[$i]) { throw 'Unsupported invitation package format.' }
     }
 
     $iv = New-Object byte[] 16
@@ -57,8 +57,17 @@ try {
     finally {
         $hmac.Dispose()
     }
-    if (-not [Security.Cryptography.CryptographicOperations]::FixedTimeEquals($actualMac, $expectedMac)) {
-        throw '邀请链接无效、已撤销，或邀请包已损坏。'
+    $macDifference = 0
+    if ($actualMac.Length -ne $expectedMac.Length) {
+        $macDifference = 1
+    }
+    else {
+        for ($i = 0; $i -lt $actualMac.Length; $i++) {
+            $macDifference = $macDifference -bor ($actualMac[$i] -bxor $expectedMac[$i])
+        }
+    }
+    if ($macDifference -ne 0) {
+        throw 'The invitation is invalid, revoked, or the package is corrupted.'
     }
 
     $aes = [Security.Cryptography.Aes]::Create()
@@ -82,10 +91,10 @@ try {
     [IO.File]::WriteAllBytes($zipPath, $plain)
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath
     $manifestPath = Join-Path $extractPath 'plugins\math-modeling-championship-max\.codex-plugin\plugin.json'
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw '解密包缺少插件清单。' }
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'The decrypted package is missing its plugin manifest.' }
     $version = (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).version
     if ($VerifyOnly) {
-        Write-Host ('邀请包验证通过：数学建模竞赛超级套件 MAX ' + $version)
+        Write-Host ('Invitation package verified: Math Modeling Championship MAX ' + $version)
         return
     }
     $safeVersion = $version -replace '[^A-Za-z0-9._-]', '-'
@@ -97,12 +106,29 @@ try {
     New-Item -ItemType Directory -Force -Path $installParent | Out-Null
     Copy-Item -LiteralPath $extractPath -Destination $installRoot -Recurse
 
+    $existingMarketplaceNames = @()
+    try {
+        $marketplaceListJson = (& codex plugin marketplace list --json | Out-String)
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($marketplaceListJson)) {
+            $marketplaceList = $marketplaceListJson | ConvertFrom-Json
+            $existingMarketplaceNames = @($marketplaceList.marketplaces | ForEach-Object { $_.name })
+        }
+    }
+    catch {
+        Write-Host 'Could not read existing plugin marketplaces; continuing with installation.'
+    }
+
+    if ($existingMarketplaceNames -contains 'zyh-mathmodel-private') {
+        & codex plugin marketplace remove 'zyh-mathmodel-private'
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to replace the previous invited marketplace.' }
+    }
+
     & codex plugin marketplace add $installRoot
-    if ($LASTEXITCODE -ne 0) { throw '添加邀请插件市场失败。' }
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to add the invited plugin marketplace.' }
     & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
-    if ($LASTEXITCODE -ne 0) { throw '安装 MAX 插件失败。' }
-    Write-Host ('安装成功：数学建模竞赛超级套件 MAX ' + $version)
-    Write-Host '请新建一个 Codex 任务后开始使用。'
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAX plugin.' }
+    Write-Host ('Installed: Math Modeling Championship MAX ' + $version)
+    Write-Host 'Create a new Codex task before using the updated plugin.'
 }
 finally {
     $resolvedWork = [IO.Path]::GetFullPath($workRoot)
