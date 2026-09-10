@@ -27,7 +27,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.
 
 若 `git clone` 失败，应先检查能否打开本 GitHub 页面或更换网络；不要改用发送者电脑上的 `marketplacePath`。
 
-每次发布前必须运行 `release_gate.ps1`：它会从 GitHub 公开地址匿名克隆一个全新副本，核对加密包摘要，验证正确口令可以解密、错误口令必然被拒绝，并检查说明中未依赖 GitHub Raw 或发送者本机路径。发布门禁未通过时不得发送邀请链接。
+每次构建时，`build_invite.ps1` 必须接收所有者当前插件目录并先运行 `parity_gate.ps1`，逐文件确认受邀版与所有者版的有效功能文件完全一致；Python 缓存等运行残留不会计入功能。每次发布后还必须运行 `release_gate.ps1`：它会从 GitHub 公开地址匿名克隆一个全新副本，核对加密包摘要，验证正确口令可以解密、错误口令必然被拒绝，并检查说明中未依赖 GitHub Raw 或发送者本机路径。任一门禁未通过时不得发送邀请链接。
 
 ## 权限说明
 

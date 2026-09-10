@@ -1,7 +1,11 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
-    [string]$InviteCode
+    [string]$InviteCode,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$CanonicalPluginRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +14,9 @@ $source = Join-Path $root 'build\marketplace'
 $zip = Join-Path $root 'build\plugin-marketplace.zip'
 $output = Join-Path $root 'payload\plugin-marketplace.aes'
 $checksum = Join-Path $root 'payload\SHA256.txt'
+$invitePluginRoot = Join-Path $source 'plugins\math-modeling-championship-max'
+
+& (Join-Path $root 'parity_gate.ps1') -CanonicalPluginRoot $CanonicalPluginRoot -InvitePluginRoot $invitePluginRoot
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 if (Test-Path -LiteralPath $zip) {
