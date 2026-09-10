@@ -8,20 +8,22 @@
 
 > 请按照此邀请链接安装“数学建模竞赛超级套件 MAX”，安装完成后新建任务验证插件。
 
-Codex 应执行以下流程：
+Codex 应执行以下流程（不要使用 `raw.githubusercontent.com`）：
 
 1. 从用户发送的完整 URL 中读取 `#invite=` 后的邀请口令。
-2. 下载本仓库的 `install.ps1`。
-3. 执行 `install.ps1 -InviteCode <邀请口令>`。
+2. 使用 `git clone --depth 1` 克隆本公开分发仓库。
+3. 从克隆目录执行 `install.ps1 -InviteCode <邀请口令>`。
 4. 安装成功后新建 Codex 任务，以便加载新版插件。
 
 人工安装命令：
 
 ```powershell
-$script = Join-Path $env:TEMP 'install-math-modeling-max.ps1'
-Invoke-WebRequest 'https://raw.githubusercontent.com/zyh051128-beep/math-modeling-championship-max-invite/main/install.ps1' -OutFile $script
-powershell -NoProfile -ExecutionPolicy Bypass -File $script -InviteCode '<填写邀请口令>'
+$folder = Join-Path $env:TEMP ('math-modeling-max-invite-' + [guid]::NewGuid().ToString('N'))
+git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git $folder
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteCode '<填写邀请口令>'
 ```
+
+若 `git clone` 失败，应先检查能否打开本 GitHub 页面或更换网络；不要改用发送者电脑上的 `marketplacePath`。
 
 ## 权限说明
 
@@ -29,4 +31,3 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $script -InviteCode '<填写
 - 使用插件产生的模型和 Token 消耗归使用者自己的 Codex/ChatGPT 账户。
 - 邀请人可发布新密钥和新加密包，使旧邀请链接不能安装后续版本。
 - 已经下载、安装或复制的旧版本无法远程收回。
-

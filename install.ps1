@@ -7,7 +7,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$payloadUrl = 'https://raw.githubusercontent.com/zyh051128-beep/math-modeling-championship-max-invite/main/payload/plugin-marketplace.aes'
 $payloadPath = Join-Path $PSScriptRoot 'payload\plugin-marketplace.aes'
 $workRoot = Join-Path ([IO.Path]::GetTempPath()) ('math-modeling-max-' + [guid]::NewGuid().ToString('N'))
 $zipPath = Join-Path $workRoot 'marketplace.zip'
@@ -26,8 +25,13 @@ function Get-Sha256Bytes([string]$Text) {
 try {
     New-Item -ItemType Directory -Force -Path $workRoot | Out-Null
     if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
-        $payloadPath = Join-Path $workRoot 'plugin-marketplace.aes'
-        Invoke-WebRequest $payloadUrl -OutFile $payloadPath
+        $distributionPath = Join-Path $workRoot 'distribution'
+        & git clone --depth 1 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git' $distributionPath
+        if ($LASTEXITCODE -ne 0) { throw '无法克隆公开邀请仓库，请检查 GitHub 网络连接。' }
+        $payloadPath = Join-Path $distributionPath 'payload\plugin-marketplace.aes'
+        if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
+            throw '邀请仓库缺少加密插件包。'
+        }
     }
 
     $blob = [IO.File]::ReadAllBytes($payloadPath)
