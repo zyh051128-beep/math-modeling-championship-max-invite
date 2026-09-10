@@ -26,20 +26,27 @@ try {
     if ($expectedSha -ne $actualSha) { throw 'The encrypted package checksum does not match.' }
 
     $installerPath = Join-Path $cloneRoot 'install.ps1'
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteCode $InviteCode -VerifyOnly
+    $invitePage = ($RepositoryUrl -replace '\.git$', '') + '#invite=' + [Uri]::EscapeDataString($InviteCode)
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $invitePage -VerifyOnly
     if ($LASTEXITCODE -ne 0) { throw 'The valid invitation code failed verification.' }
 
     $wrongCode = 'invalid-' + [guid]::NewGuid().ToString('N')
     $previousErrorAction = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteCode $wrongCode -VerifyOnly *> $null
+    $wrongInvitePage = ($RepositoryUrl -replace '\.git$', '') + '#invite=' + [Uri]::EscapeDataString($wrongCode)
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $wrongInvitePage -VerifyOnly *> $null
     $wrongCodeExit = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorAction
     if ($wrongCodeExit -eq 0) { throw 'An invalid invitation code was not rejected.' }
 
     $readme = Get-Content -LiteralPath (Join-Path $cloneRoot 'README.md') -Raw
+    $codexInstallPath = Join-Path $cloneRoot 'CODEX_INSTALL.md'
+    if (-not (Test-Path -LiteralPath $codexInstallPath -PathType Leaf)) { throw 'CODEX_INSTALL.md is missing.' }
+    $codexInstall = Get-Content -LiteralPath $codexInstallPath -Raw
     if ($readme -match 'https?://raw\.githubusercontent\.com') { throw 'README still depends on GitHub Raw.' }
+    if ($codexInstall -match 'https?://raw\.githubusercontent\.com') { throw 'CODEX_INSTALL.md still depends on GitHub Raw.' }
     if ($readme -match 'marketplacePath=|C:\\Users\\') { throw 'README leaks or depends on a sender-local path.' }
+    if ($codexInstall -match 'marketplacePath=|C:\\Users\\') { throw 'CODEX_INSTALL.md leaks or depends on a sender-local path.' }
 
     Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
 }

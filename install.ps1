@@ -1,12 +1,35 @@
 param(
-    [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$InviteCode,
+
+    [ValidateNotNullOrEmpty()]
+    [string]$InviteUrl,
 
     [switch]$VerifyOnly
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($InviteCode) -and -not [string]::IsNullOrWhiteSpace($InviteUrl)) {
+    try {
+        $inviteUri = [Uri]$InviteUrl
+        $fragment = $inviteUri.Fragment.TrimStart('#')
+        foreach ($part in ($fragment -split '&')) {
+            $pair = $part -split '=', 2
+            if ($pair.Length -eq 2 -and $pair[0] -eq 'invite') {
+                $InviteCode = [Uri]::UnescapeDataString($pair[1])
+                break
+            }
+        }
+    }
+    catch {
+        throw 'The supplied invitation URL is not valid.'
+    }
+}
+if ([string]::IsNullOrWhiteSpace($InviteCode)) {
+    throw 'Supply either -InviteUrl with the complete invitation link or -InviteCode with the invitation code.'
+}
+
 $payloadPath = Join-Path $PSScriptRoot 'payload\plugin-marketplace.aes'
 $workRoot = Join-Path ([IO.Path]::GetTempPath()) ('math-modeling-max-' + [guid]::NewGuid().ToString('N'))
 $zipPath = Join-Path $workRoot 'marketplace.zip'
@@ -90,8 +113,20 @@ try {
 
     [IO.File]::WriteAllBytes($zipPath, $plain)
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath
-    $manifestPath = Join-Path $extractPath 'plugins\math-modeling-championship-max\.codex-plugin\plugin.json'
-    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'The decrypted package is missing its plugin manifest.' }
+    $pluginRoot = Join-Path $extractPath 'plugins\math-modeling-championship-max'
+    $manifestPath = Join-Path $pluginRoot '.codex-plugin\plugin.json'
+    $requiredEntrypoints = @(
+        $manifestPath,
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-max\SKILL.md'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship\SKILL.md'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\doctor.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\state_manager.py')
+    )
+    foreach ($requiredEntrypoint in $requiredEntrypoints) {
+        if (-not (Test-Path -LiteralPath $requiredEntrypoint -PathType Leaf)) {
+            throw ('The decrypted package is incomplete. Missing: ' + $requiredEntrypoint.Substring($pluginRoot.Length).TrimStart('\'))
+        }
+    }
     $version = (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).version
     if ($VerifyOnly) {
         Write-Host ('Invitation package verified: Math Modeling Championship MAX ' + $version)
@@ -127,7 +162,20 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Unable to add the invited plugin marketplace.' }
     & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
     if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAX plugin.' }
+    $doctorPath = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-max\scripts\max_doctor.ps1'
+    $doctorJson = (& powershell -NoProfile -ExecutionPolicy Bypass -File $doctorPath -Delivery word -Profile core | Out-String)
+    $doctorExitCode = $LASTEXITCODE
+    if ($doctorExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($doctorJson)) {
+        throw 'The plugin was copied, but its built-in Doctor did not complete successfully.'
+    }
+    $doctorReport = $doctorJson | ConvertFrom-Json
+    if (-not $doctorReport.ready -or
+        -not $doctorReport.base_suite.available -or
+        @($doctorReport.blocking_failures).Count -ne 0) {
+        throw 'The plugin installation is incomplete according to the built-in Doctor.'
+    }
     Write-Host ('Installed: Math Modeling Championship MAX ' + $version)
+    Write-Host 'Doctor passed: MAX and the bundled base suite are complete.'
     Write-Host 'Create a new Codex task before using the updated plugin.'
 }
 finally {
