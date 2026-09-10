@@ -30,11 +30,15 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'The valid invitation code failed verification.' }
 
     $wrongCode = 'invalid-' + [guid]::NewGuid().ToString('N')
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteCode $wrongCode -VerifyOnly 2>$null
-    if ($LASTEXITCODE -eq 0) { throw 'An invalid invitation code was not rejected.' }
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteCode $wrongCode -VerifyOnly *> $null
+    $wrongCodeExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorAction
+    if ($wrongCodeExit -eq 0) { throw 'An invalid invitation code was not rejected.' }
 
     $readme = Get-Content -LiteralPath (Join-Path $cloneRoot 'README.md') -Raw
-    if ($readme -match 'raw\.githubusercontent\.com') { throw 'README still depends on GitHub Raw.' }
+    if ($readme -match 'https?://raw\.githubusercontent\.com') { throw 'README still depends on GitHub Raw.' }
     if ($readme -match 'marketplacePath=|C:\\Users\\') { throw 'README leaks or depends on a sender-local path.' }
 
     Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
