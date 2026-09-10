@@ -43,10 +43,14 @@ try {
     $codexInstallPath = Join-Path $cloneRoot 'CODEX_INSTALL.md'
     if (-not (Test-Path -LiteralPath $codexInstallPath -PathType Leaf)) { throw 'CODEX_INSTALL.md is missing.' }
     $codexInstall = Get-Content -LiteralPath $codexInstallPath -Raw
+    $troubleshootingPath = Join-Path $cloneRoot 'TROUBLESHOOTING.md'
+    if (-not (Test-Path -LiteralPath $troubleshootingPath -PathType Leaf)) { throw 'TROUBLESHOOTING.md is missing.' }
+    $troubleshooting = Get-Content -LiteralPath $troubleshootingPath -Raw
     if ($readme -match 'https?://raw\.githubusercontent\.com') { throw 'README still depends on GitHub Raw.' }
     if ($codexInstall -match 'https?://raw\.githubusercontent\.com') { throw 'CODEX_INSTALL.md still depends on GitHub Raw.' }
     if ($readme -match 'marketplacePath=|C:\\Users\\') { throw 'README leaks or depends on a sender-local path.' }
     if ($codexInstall -match 'marketplacePath=|C:\\Users\\') { throw 'CODEX_INSTALL.md leaks or depends on a sender-local path.' }
+    if ($troubleshooting -match 'marketplacePath=|C:\\Users\\') { throw 'TROUBLESHOOTING.md leaks or depends on a sender-local path.' }
 
     Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
 }
