@@ -122,10 +122,12 @@ Wolfram与SciSpace没有在本插件中嵌入共享账号、API密钥或第三�
 
 ## 6. 受邀者必须完成的验收
 
+2.4 新增中文总包、Word 原生源稿和真实导出门禁。必须找到 `export_word_pdf.py`、`word_source_audit.py`、`build_delivery_zip.py` 与 `word-delivery-contract.md`。先创建含真实正文、表格和公式的可编辑 DOCX，再用真实 Word 或明确选择的 LibreOffice 导出 PDF；缺排版器就报告该路线未就绪，`python-docx` 不能替代排版程序。导出器会拒绝宏、OLE、DDE 和外部关系（含可点击外链；可先改为纯文本网址），并保留原件、日志及哈希。Windows 本机曾验证真实 Word 路线；LibreOffice 必须在接收者设备另外实测，不得沿用发送者的成功记录。Word 许可证不随邀请共享。
+
 2.3新增的路线图/逐问步骤图使用已有core中的Matplotlib、Pillow与PyMuPDF，无新增桌面软件或在线账号硬依赖。安装后必须能找到 `render_flowcharts.py`、`presentation_audit.py` 和 `presentation-workflow.md`；缺失说明安装包或缓存不完整。中文需要本机合法且覆盖所用字形的字体，缺字会明确失败，不允许静默生成方框。按随包合成示例至少导出一次SVG/PDF/PNG；正式项目复制渲染源码到项目内并使用 `--project-root`。模板字体、商业许可证和可选Graphviz依旧按本说明单独准备，不随邀请共享。
 
 1. **插件加载**：重启Codex、新建普通任务，确认能调用 `math-modeling-championship-maxx`，并找到本文件和随包审计程序。安装状态与运行环境状态分别保留。
-2. **当前交付路线检查**：使用实际环境解释器运行 `scripts/max_doctor.py --delivery word --profile championship --inputs csv xlsx`；LaTeX选`latex`，双份交付选`both`。Windows也可用 `scripts/max_doctor.ps1 -Delivery word -Profile championship`。自定义解释器时可设置当前会话 `MATHMODEL_PYTHON` 为其完整路径。`ready: true`只代表该配置的基础条件通过，并不证明所有可选应用已实跑。
+2. **当前交付路线检查**：使用实际环境解释器运行 `scripts/max_doctor.py --delivery word --profile championship --inputs csv xlsx`；另需LaTeX时选`both`，因为Word仍是必交源稿。Windows也可用 `scripts/max_doctor.ps1 -Delivery word -Profile championship`。自定义解释器时可设置当前会话 `MATHMODEL_PYTHON` 为其完整路径。`ready: true`只代表该配置的基础条件通过，并不证明真实Word导出或所有可选应用已实跑。
 3. **实际集成测试**：用同一解释器运行 `scripts/app_integration_smoke.py --output-dir <全新空目录>`。核对生成的图、DOCX、PDF与运行回执。`PASS_WITH_FALLBACK`应说明替代了什么；`NOT_RUN`不能计为通过。此测试为合成数据，只核验工具链，不证明具体题目解答正确。
 4. **所选外部应用逐项验证**：按第4–5节运行最小样例；在线服务每个接收者自行连接并实调。输出清单至少包含应用/包、版本或版本未知、解释器/程序路径、测试输入、返回/产物、退出状态、时间及缺口。缺少许可、登录、网络或系统依赖时保留原状态与修复办法。
 5. **正式演练题目回归**：拿题面和附件从输入清单开始完整运行，检查代码、约束、数值与图文一致性、非程序AI内容台账、逐页版式、材料包清单和二次复核。仅当所选路线全部满足该题需求，才宣告这台电脑的该题工作流可交付。

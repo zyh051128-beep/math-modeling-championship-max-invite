@@ -188,7 +188,7 @@ try {
     foreach ($name in @('math-modeling-championship-maxx', 'math-modeling-championship-max', 'math-modeling-championship')) {
         Write-Fixture ($plugin + '\skills\' + $name + '\SKILL.md') ('---' + "`nname: " + $name + "`ndescription: Synthetic installer fixture.`n---`nFixture only.")
     }
-    foreach ($name in @('huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py', 'render_flowcharts.py', 'presentation_audit.py')) {
+    foreach ($name in @('huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py', 'render_flowcharts.py', 'presentation_audit.py', 'export_word_pdf.py', 'word_source_audit.py', 'build_delivery_zip.py', 'page_budget_audit.py', 'algorithm_verification_audit.py', 'edit_figure_spec.py')) {
         Write-Fixture ($maxx + '\scripts\' + $name) '# Synthetic required-entrypoint fixture; not a functional model.'
     }
     foreach ($name in @('doctor.py', 'state_manager.py')) {
@@ -196,10 +196,10 @@ try {
     }
     Write-Fixture ($maxx + '\references\runtime-profiles.json') '{"fixture":true}'
     Write-Fixture ($maxx + '\references\external-installation.md') '# Synthetic installation guide'
-    foreach ($name in @('flowchart-spec-example.json', 'presentation-manifest-template.json')) {
+    foreach ($name in @('flowchart-spec-example.json', 'presentation-manifest-template.json', 'word-delivery-manifest-template.json')) {
         Write-Fixture ($maxx + '\references\' + $name) '{"fixture":true}'
     }
-    foreach ($name in @('presentation-contract.md', 'presentation-workflow.md')) {
+    foreach ($name in @('presentation-contract.md', 'presentation-workflow.md', 'word-delivery-contract.md')) {
         Write-Fixture ($maxx + '\references\' + $name) '# Synthetic presentation requirements'
     }
     Write-Fixture ($maxx + '\scripts\bootstrap_runtime.py') @'
@@ -295,28 +295,30 @@ exit 0
     # A correctly authenticated package must still be rejected if a new critical
     # presentation feature is absent. Use a separate fixture, not real files.
     $completeFixture = $FixtureRoot
-    $incompleteFixture = Join-Path $testRoot 'bad'
+    foreach ($missingFeature in @('render_flowcharts.py', 'word_source_audit.py', 'page_budget_audit.py', 'algorithm_verification_audit.py', 'edit_figure_spec.py')) {
+    $incompleteFixture = Join-Path $testRoot ('bad-' + $missingFeature)
     New-Item -ItemType Directory -Path (Join-Path $incompleteFixture 'payload') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $completeFixture 'install.ps1') -Destination (Join-Path $incompleteFixture 'install.ps1')
     $incompleteZip = Join-Path $incompleteFixture 'fixture.zip'
     Copy-Item -LiteralPath $zip -Destination $incompleteZip
     $archive = [IO.Compression.ZipFile]::Open($incompleteZip, [IO.Compression.ZipArchiveMode]::Update)
     try {
-        $missingPath = 'plugins/math-modeling-championship-max/skills/math-modeling-championship-maxx/scripts/render_flowcharts.py'
+        $missingPath = 'plugins/math-modeling-championship-max/skills/math-modeling-championship-maxx/scripts/' + $missingFeature
         $entry = @($archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq $missingPath })
         Assert-Test ($entry.Count -eq 1) 'Negative fixture must remove exactly one critical presentation file.'
         $entry[0].Delete()
     } finally { $archive.Dispose() }
     Write-TestPayload $incompleteZip (Join-Path $incompleteFixture 'payload\plugin-marketplace.aes')
     $FixtureRoot = $incompleteFixture
-    $case = Join-Path $testRoot 'n'
+    $case = Join-Path $testRoot ('n-' + $missingFeature)
     try { $run = Invoke-Case 'healthy' $case }
     finally { $FixtureRoot = $completeFixture }
     Assert-Test ($run.ExitCode -ne 0 -and $run.ExitCode -ne 2) ('Missing critical feature was not rejected before installation: ' + $run.Output)
-    Assert-Test ($run.Output -match 'The decrypted package is incomplete' -and $run.Output -match 'render_flowcharts.py') 'Missing-feature error did not identify the incomplete package and absent file.'
+    Assert-Test ($run.Output -match 'The decrypted package is incomplete' -and $run.Output.Contains($missingFeature)) 'Missing-feature error did not identify the incomplete package and absent file.'
     Assert-Test (@(Get-InstallRoots $case).Count -eq 0) 'Incomplete presentation package left an installation directory.'
     Assert-Test (-not (Test-Path -LiteralPath (Join-Path $case 'codex-calls.txt'))) 'Incomplete presentation package reached Codex registration.'
-    $results.Add([pscustomobject]@{ test = 'missing render_flowcharts.py rejects authenticated package before installation'; status = 'PASS' })
+    $results.Add([pscustomobject]@{ test = ('missing ' + $missingFeature + ' rejects authenticated package before installation'); status = 'PASS' })
+    }
 
     $report = [pscustomobject]@{
         status = 'PASS'
