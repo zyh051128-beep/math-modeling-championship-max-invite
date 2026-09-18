@@ -45,6 +45,22 @@ function Get-Sha256Bytes([string]$Text) {
     }
 }
 
+function Assert-MaxDoctor([string]$DoctorPath) {
+    $doctorJson = (& powershell -NoProfile -ExecutionPolicy Bypass -File $DoctorPath -Delivery word -Profile championship | Out-String)
+    $doctorExitCode = $LASTEXITCODE
+    if ($doctorExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($doctorJson)) {
+        throw 'The built-in MAXx Doctor did not complete successfully.'
+    }
+    $doctorReport = $doctorJson | ConvertFrom-Json
+    if (-not $doctorReport.ready -or
+        -not $doctorReport.base_suite.available -or
+        -not $doctorReport.base_suite.ready -or
+        @($doctorReport.base_suite.blocking_failures).Count -ne 0 -or
+        @($doctorReport.blocking_failures).Count -ne 0) {
+        throw 'The plugin package is incomplete or this computer is not ready according to the built-in Doctor.'
+    }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $workRoot | Out-Null
     if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
@@ -117,7 +133,11 @@ try {
     $manifestPath = Join-Path $pluginRoot '.codex-plugin\plugin.json'
     $requiredEntrypoints = @(
         $manifestPath,
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\SKILL.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-max\SKILL.md'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\huawei_cup_audit.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\evidence_consistency_audit.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\ai_content_audit.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\SKILL.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\doctor.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\state_manager.py')
@@ -128,8 +148,10 @@ try {
         }
     }
     $version = (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).version
+    $preflightDoctorPath = Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
+    Assert-MaxDoctor $preflightDoctorPath
     if ($VerifyOnly) {
-        Write-Host ('Invitation package verified: Math Modeling Championship MAX ' + $version)
+        Write-Host ('Invitation package verified: 数模-MAXx ' + $version)
         return
     }
     $safeVersion = $version -replace '[^A-Za-z0-9._-]', '-'
@@ -161,21 +183,11 @@ try {
     & codex plugin marketplace add $installRoot
     if ($LASTEXITCODE -ne 0) { throw 'Unable to add the invited plugin marketplace.' }
     & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAX plugin.' }
-    $doctorPath = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-max\scripts\max_doctor.ps1'
-    $doctorJson = (& powershell -NoProfile -ExecutionPolicy Bypass -File $doctorPath -Delivery word -Profile core | Out-String)
-    $doctorExitCode = $LASTEXITCODE
-    if ($doctorExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($doctorJson)) {
-        throw 'The plugin was copied, but its built-in Doctor did not complete successfully.'
-    }
-    $doctorReport = $doctorJson | ConvertFrom-Json
-    if (-not $doctorReport.ready -or
-        -not $doctorReport.base_suite.available -or
-        @($doctorReport.blocking_failures).Count -ne 0) {
-        throw 'The plugin installation is incomplete according to the built-in Doctor.'
-    }
-    Write-Host ('Installed: Math Modeling Championship MAX ' + $version)
-    Write-Host 'Doctor passed: MAX and the bundled base suite are complete.'
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAXx plugin.' }
+    $doctorPath = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
+    Assert-MaxDoctor $doctorPath
+    Write-Host ('Installed: 数模-MAXx ' + $version)
+    Write-Host 'Doctor passed: MAXx, the Huawei Cup audit layer, and the bundled base suite are complete.'
     Write-Host 'Create a new Codex task before using the updated plugin.'
 }
 finally {

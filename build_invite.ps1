@@ -9,6 +9,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($InviteCode.Length -lt 32 -or ($InviteCode.ToCharArray() | Select-Object -Unique).Count -lt 16) {
+    throw 'InviteCode must contain at least 32 characters and at least 16 distinct characters.'
+}
 $root = $PSScriptRoot
 $source = Join-Path $root 'build\marketplace'
 $zip = Join-Path $root 'build\plugin-marketplace.zip'
@@ -16,7 +20,52 @@ $output = Join-Path $root 'payload\plugin-marketplace.aes'
 $checksum = Join-Path $root 'payload\SHA256.txt'
 $invitePluginRoot = Join-Path $source 'plugins\math-modeling-championship-max'
 
-& (Join-Path $root 'parity_gate.ps1') -CanonicalPluginRoot $CanonicalPluginRoot -InvitePluginRoot $invitePluginRoot
+$canonicalResolved = [IO.Path]::GetFullPath($CanonicalPluginRoot).TrimEnd('\')
+if (-not (Test-Path -LiteralPath $canonicalResolved -PathType Container)) {
+    throw ('CanonicalPluginRoot does not exist: ' + $canonicalResolved)
+}
+$canonicalManifest = Join-Path $canonicalResolved '.codex-plugin\plugin.json'
+if (-not (Test-Path -LiteralPath $canonicalManifest -PathType Leaf)) {
+    throw ('Canonical plugin manifest is missing: ' + $canonicalManifest)
+}
+
+# Rebuild the encrypted marketplace from the canonical plugin every time so an
+# old ignored build directory can never silently become the invited release.
+$sourceResolved = [IO.Path]::GetFullPath($source)
+$expectedBuildParent = [IO.Path]::GetFullPath((Join-Path $root 'build')).TrimEnd('\')
+if ([IO.Path]::GetDirectoryName($sourceResolved).TrimEnd('\') -ne $expectedBuildParent) {
+    throw ('Unsafe build source path: ' + $sourceResolved)
+}
+if (Test-Path -LiteralPath $sourceResolved) {
+    Remove-Item -LiteralPath $sourceResolved -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path (Join-Path $sourceResolved '.agents\plugins') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $sourceResolved 'plugins') | Out-Null
+Copy-Item -LiteralPath $canonicalResolved -Destination $invitePluginRoot -Recurse
+Get-ChildItem -LiteralPath $invitePluginRoot -Recurse -Directory -Filter '__pycache__' |
+    Remove-Item -Recurse -Force
+Get-ChildItem -LiteralPath $invitePluginRoot -Recurse -File -Filter '*.pyc' |
+    Remove-Item -Force
+$marketplace = [ordered]@{
+    name = 'zyh-mathmodel-private'
+    interface = [ordered]@{ displayName = '数模-MAXx 私有市场' }
+    plugins = @(
+        [ordered]@{
+            name = 'math-modeling-championship-max'
+            source = [ordered]@{ source = 'local'; path = './plugins/math-modeling-championship-max' }
+            policy = [ordered]@{ installation = 'AVAILABLE'; authentication = 'ON_INSTALL' }
+            category = 'Education'
+        }
+    )
+}
+$marketplacePath = Join-Path $sourceResolved '.agents\plugins\marketplace.json'
+[IO.File]::WriteAllText(
+    $marketplacePath,
+    (($marketplace | ConvertTo-Json -Depth 8) + [Environment]::NewLine),
+    [Text.UTF8Encoding]::new($false)
+)
+
+& (Join-Path $root 'parity_gate.ps1') -CanonicalPluginRoot $canonicalResolved -InvitePluginRoot $invitePluginRoot
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 if (Test-Path -LiteralPath $zip) {
