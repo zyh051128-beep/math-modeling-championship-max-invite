@@ -151,7 +151,7 @@ try {
     $preflightDoctorPath = Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
     Assert-MaxDoctor $preflightDoctorPath
     if ($VerifyOnly) {
-        Write-Host ('Invitation package verified: 数模-MAXx ' + $version)
+        Write-Host ('Invitation package verified: Shumo-MAXx ' + $version)
         return
     }
     $safeVersion = $version -replace '[^A-Za-z0-9._-]', '-'
@@ -186,7 +186,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAXx plugin.' }
     $doctorPath = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
     Assert-MaxDoctor $doctorPath
-    Write-Host ('Installed: 数模-MAXx ' + $version)
+    Write-Host ('Installed: Shumo-MAXx ' + $version)
     Write-Host 'Doctor passed: MAXx, the Huawei Cup audit layer, and the bundled base suite are complete.'
     Write-Host 'Create a new Codex task before using the updated plugin.'
 }

@@ -53,6 +53,7 @@ try {
     if ($troubleshooting -match 'marketplacePath=|C:\\Users\\') { throw 'TROUBLESHOOTING.md leaks or depends on a sender-local path.' }
 
     Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
+    $global:LASTEXITCODE = 0
 }
 finally {
     Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
