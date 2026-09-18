@@ -2,28 +2,30 @@
 
 本仓库只保存加密后的插件分发包，不包含可直接读取的插件源码。完整邀请链接末尾带有 `#invite=...`，邀请口令位于 URL 片段中，不会发送给 GitHub 服务器。
 
-当前邀请包保留稳定插件标识 `math-modeling-championship-max`，首选总控技能为 `math-modeling-championship-maxx`，并保留旧名称兼容入口；同时内置完整的基础套件及经许可审计、固定版本的图表、附件、引文、MATLAB 代码和结果一致性技能。安装器会检查 MAXx、华为杯审计、兼容入口、基础运行时和受邀版与所有者版的功能文件一致性，缺少关键文件都会停止安装。
+当前邀请包保留稳定插件标识 `math-modeling-championship-max`，首选总控技能为 `math-modeling-championship-maxx`，并保留旧名称兼容入口；同时内置完整的基础套件及经许可审计、固定版本的图表、附件、引文、MATLAB 代码和结果一致性技能。构建时逐文件核验受邀版与所有者版的功能一致性；安装器验证加密载荷完整性，并检查 MAXx、华为杯审计、兼容入口和基础运行时等关键文件，缺失即停止安装。
 
 ## 最简单的使用方式
 
 受邀者只需把**完整邀请链接**发送给 Codex，并说：
 
-> 请从这个完整邀请链接自动安装或更新“数模-MAXx”，完成后运行内置 Doctor 验证，并提示我新建任务。不要逐个安装相关技能。
+> 请按仓库 CODEX_INSTALL.md 和 DEPENDENCIES.md 安装或更新“数模-MAXx”，建立 extended 独立运行环境，补齐需要的绘图、排版、PDF 和文献功能，检查 Wolfram/SciSpace 等账号连接，运行 Doctor 与真实功能检查。逐项列出已实跑能力和待我完成的账号/许可证步骤，保存安装报告，最后提示我新建普通任务使用。不要逐个重复安装随包技能。
 
-其余步骤由 Codex 完成。受邀者不需要登录 GitHub，不需要添加私人仓库权限，不需要逐个安装随包技能，也不需要手工配置插件市场。每次安装或更新必须克隆到新的临时目录，禁止复用旧克隆或旧下载缓存。外部应用如 MATLAB、Word、R、LaTeX、Wolfram 及 Python 第三方库是否可用，仍取决于受邀者本机环境、账号连接与许可；Wolfram 只作为公开/脱敏公式的可选交叉核验，不随安装包自动连接。插件会检测并标明 `NOT_RUN` 或替代路线，不虚报零配置、已执行或国奖质量。
+其余步骤由 Codex 完成。受邀者不需要登录 GitHub，不需要添加私人仓库权限，不需要逐个安装随包技能，也不需要手工配置插件市场。每次安装或更新必须克隆到新的临时目录，禁止复用旧克隆或旧下载缓存。外部应用如 MATLAB、Word、R、LaTeX、Wolfram、SciSpace 及 Python 第三方库是否可用，仍取决于受邀者本机环境、账号连接与许可。Wolfram 用于公开/脱敏公式的可选交叉核验，SciSpace 用于可选文献发现与回源核验；其流程与离线整理程序随包提供，外部账号不会自动连接。插件会检测并标明 `NOT_RUN` 或替代路线，不虚报零配置、已执行或国奖质量。
 
 ## 交给 Codex 安装
 
+完整附加功能清单、官方安装入口和验证方法见 [DEPENDENCIES.md](DEPENDENCIES.md)。插件运行环境可自动建立；外部应用与账号按这份清单补齐，逐项报告实际状态。
+
 收到邀请链接后，把**完整链接**发送给 Codex，并说：
 
-> 请按照此邀请链接安装“数模-MAXx”，安装完成后新建任务验证插件。
+> 请按照此邀请链接安装或更新“数模-MAXx”，在当前任务运行内置 Doctor，完成后提示我新建普通任务使用新版。
 
 Codex 应执行以下流程（不要使用 `raw.githubusercontent.com`，不要逐个安装关联技能）：
 
 1. 从用户发送的完整 URL 中读取 `#invite=` 后的邀请口令。
 2. 使用 `git clone --depth 1` 克隆本公开分发仓库。
-3. 从克隆目录执行 `install.ps1 -InviteUrl <完整邀请链接>`。安装器会自动读取邀请码，并识别和替换同一邀请市场的旧版本。
-4. 安装器会在当前会话自动运行 Doctor；不要再创建独立验证任务。
+3. 从克隆目录执行 `install.ps1 -InviteUrl <完整邀请链接> -SetupRuntime -RuntimeProfile extended -Delivery word`。安装器会自动读取邀请码，并识别和替换同一邀请市场的旧版本。
+4. 安装器会建立隔离 Python 环境并运行 Doctor，保存安装与环境报告。退出码 `2` 表示插件已安装而环境待补齐，按 DEPENDENCIES.md 处理，不要反复重装或虚报全部就绪；不要再创建独立验证任务。
 5. 安装成功后完全退出并重新打开 Codex，再新建一个普通任务加载新版插件。
 
 已经安装过旧版的用户，重新把同一个完整邀请链接发给 Codex并执行上述流程，即可升级到邀请包中的最新版，无需邀请人再次审批。
@@ -33,7 +35,7 @@ Codex 应执行以下流程（不要使用 `raw.githubusercontent.com`，不要�
 ```powershell
 $folder = Join-Path $env:TEMP ('math-modeling-max-invite-' + [guid]::NewGuid().ToString('N'))
 git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git $folder
-powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteUrl '<粘贴完整邀请链接>'
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteUrl '<粘贴完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery word
 ```
 
 若 `git clone` 失败，应先检查能否打开本 GitHub 页面或更换网络；不要改用发送者电脑上的 `marketplacePath`。

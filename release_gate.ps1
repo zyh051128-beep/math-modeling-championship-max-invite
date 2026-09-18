@@ -39,18 +39,22 @@ try {
     $ErrorActionPreference = $previousErrorAction
     if ($wrongCodeExit -eq 0) { throw 'An invalid invitation code was not rejected.' }
 
-    $readme = Get-Content -LiteralPath (Join-Path $cloneRoot 'README.md') -Raw
+    $readme = Get-Content -LiteralPath (Join-Path $cloneRoot 'README.md') -Raw -Encoding UTF8
     $codexInstallPath = Join-Path $cloneRoot 'CODEX_INSTALL.md'
     if (-not (Test-Path -LiteralPath $codexInstallPath -PathType Leaf)) { throw 'CODEX_INSTALL.md is missing.' }
-    $codexInstall = Get-Content -LiteralPath $codexInstallPath -Raw
+    $codexInstall = Get-Content -LiteralPath $codexInstallPath -Raw -Encoding UTF8
     $troubleshootingPath = Join-Path $cloneRoot 'TROUBLESHOOTING.md'
     if (-not (Test-Path -LiteralPath $troubleshootingPath -PathType Leaf)) { throw 'TROUBLESHOOTING.md is missing.' }
-    $troubleshooting = Get-Content -LiteralPath $troubleshootingPath -Raw
+    $troubleshooting = Get-Content -LiteralPath $troubleshootingPath -Raw -Encoding UTF8
+    $dependenciesPath = Join-Path $cloneRoot 'DEPENDENCIES.md'
+    if (-not (Test-Path -LiteralPath $dependenciesPath -PathType Leaf)) { throw 'DEPENDENCIES.md is missing.' }
+    $dependencies = Get-Content -LiteralPath $dependenciesPath -Raw -Encoding UTF8
     if ($readme -match 'https?://raw\.githubusercontent\.com') { throw 'README still depends on GitHub Raw.' }
     if ($codexInstall -match 'https?://raw\.githubusercontent\.com') { throw 'CODEX_INSTALL.md still depends on GitHub Raw.' }
     if ($readme -match 'marketplacePath=|C:\\Users\\') { throw 'README leaks or depends on a sender-local path.' }
     if ($codexInstall -match 'marketplacePath=|C:\\Users\\') { throw 'CODEX_INSTALL.md leaks or depends on a sender-local path.' }
     if ($troubleshooting -match 'marketplacePath=|C:\\Users\\') { throw 'TROUBLESHOOTING.md leaks or depends on a sender-local path.' }
+    if ($dependencies -match 'marketplacePath=|C:\\Users\\') { throw 'DEPENDENCIES.md leaks or depends on a sender-local path.' }
 
     Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
     $global:LASTEXITCODE = 0

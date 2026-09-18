@@ -5,10 +5,22 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$InviteUrl,
 
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+
+    [switch]$SetupRuntime,
+
+    [ValidateSet('core', 'extended')]
+    [string]$RuntimeProfile = 'extended',
+
+    [ValidateSet('word', 'latex', 'both')]
+    [string]$Delivery = 'word',
+
+    [string]$PythonPath
 )
 
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 
 if ([string]::IsNullOrWhiteSpace($InviteCode) -and -not [string]::IsNullOrWhiteSpace($InviteUrl)) {
     try {
@@ -45,20 +57,23 @@ function Get-Sha256Bytes([string]$Text) {
     }
 }
 
-function Assert-MaxDoctor([string]$DoctorPath) {
-    $doctorJson = (& powershell -NoProfile -ExecutionPolicy Bypass -File $DoctorPath -Delivery word -Profile championship | Out-String)
-    $doctorExitCode = $LASTEXITCODE
-    if ($doctorExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($doctorJson)) {
-        throw 'The built-in MAXx Doctor did not complete successfully.'
+function Find-RealPython {
+    $candidates = @()
+    if ($PythonPath) { $candidates += $PythonPath }
+    if ($env:MATHMODEL_PYTHON) { $candidates += $env:MATHMODEL_PYTHON }
+    $bundled = Join-Path $env:USERPROFILE '.cache\codex-runtimes'
+    if (Test-Path -LiteralPath $bundled) {
+        $candidates += Get-ChildItem -LiteralPath $bundled -Filter python.exe -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\dependencies\\python\\python\.exe$' } |
+            Select-Object -ExpandProperty FullName
     }
-    $doctorReport = $doctorJson | ConvertFrom-Json
-    if (-not $doctorReport.ready -or
-        -not $doctorReport.base_suite.available -or
-        -not $doctorReport.base_suite.ready -or
-        @($doctorReport.base_suite.blocking_failures).Count -ne 0 -or
-        @($doctorReport.blocking_failures).Count -ne 0) {
-        throw 'The plugin package is incomplete or this computer is not ready according to the built-in Doctor.'
-    }
+    $command = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($command -and $command.Source -notmatch '\\WindowsApps\\') { $candidates += $command.Source }
+    return $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+}
+
+function Write-InstallJson([string]$Path, [object]$Value) {
+    [IO.File]::WriteAllText($Path, (($Value | ConvertTo-Json -Depth 12) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 }
 
 try {
@@ -138,6 +153,10 @@ try {
         (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\huawei_cup_audit.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\evidence_consistency_audit.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\ai_content_audit.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\scispace_evidence.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\bootstrap_runtime.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\references\runtime-profiles.json'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\references\external-installation.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\SKILL.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\doctor.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship\scripts\state_manager.py')
@@ -147,48 +166,143 @@ try {
             throw ('The decrypted package is incomplete. Missing: ' + $requiredEntrypoint.Substring($pluginRoot.Length).TrimStart('\'))
         }
     }
-    $version = (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).version
-    $preflightDoctorPath = Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
-    Assert-MaxDoctor $preflightDoctorPath
+    $version = (Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestPath | ConvertFrom-Json).version
     if ($VerifyOnly) {
-        Write-Host ('Invitation package verified: Shumo-MAXx ' + $version)
+        Write-Host ('Invitation package verified (decryption and required files only): Shumo-MAXx ' + $version)
         return
     }
-    $safeVersion = $version -replace '[^A-Za-z0-9._-]', '-'
-    $installParent = Join-Path $env:USERPROFILE 'codex-invited-marketplaces'
-    $installRoot = Join-Path $installParent ('math-modeling-championship-max-' + $safeVersion)
-    if (Test-Path -LiteralPath $installRoot) {
-        $installRoot += '-' + (Get-Date -Format 'yyyyMMddHHmmss')
+    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+        throw 'Codex CLI is not available. Install/open Codex first; see DEPENDENCIES.md.'
     }
+    $installParent = Join-Path $env:USERPROFILE 'codex-invited-marketplaces'
+    # Keep the prefix short for Windows PowerShell 5.1 path limits. The manifest
+    # and installation-state.json retain the full release version.
+    $installRoot = Join-Path $installParent ('maxx-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $installParent | Out-Null
-    Copy-Item -LiteralPath $extractPath -Destination $installRoot -Recurse
+    New-Item -ItemType Directory -Path $installRoot | Out-Null
+    Get-ChildItem -LiteralPath $extractPath -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $installRoot -Recurse
+    }
 
     $existingMarketplaceNames = @()
+    $previousMarketplaceRoot = $null
     try {
         $marketplaceListJson = (& codex plugin marketplace list --json | Out-String)
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($marketplaceListJson)) {
             $marketplaceList = $marketplaceListJson | ConvertFrom-Json
             $existingMarketplaceNames = @($marketplaceList.marketplaces | ForEach-Object { $_.name })
+            $previousMarketplaceRoot = @($marketplaceList.marketplaces | Where-Object { $_.name -eq 'zyh-mathmodel-private' } | Select-Object -First 1 | ForEach-Object { $_.root }) | Select-Object -First 1
         }
     }
     catch {
         Write-Host 'Could not read existing plugin marketplaces; continuing with installation.'
     }
 
-    if ($existingMarketplaceNames -contains 'zyh-mathmodel-private') {
-        & codex plugin marketplace remove 'zyh-mathmodel-private'
-        if ($LASTEXITCODE -ne 0) { throw 'Unable to replace the previous invited marketplace.' }
+    $newMarketplaceAdded = $false
+    try {
+        if ($existingMarketplaceNames -contains 'zyh-mathmodel-private') {
+            & codex plugin marketplace remove 'zyh-mathmodel-private'
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to replace the previous invited marketplace.' }
+        }
+        & codex plugin marketplace add $installRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to add the invited plugin marketplace.' }
+        $newMarketplaceAdded = $true
+        & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAXx plugin.' }
     }
-
-    & codex plugin marketplace add $installRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to add the invited plugin marketplace.' }
-    & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to install the MAXx plugin.' }
-    $doctorPath = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-maxx\scripts\max_doctor.ps1'
-    Assert-MaxDoctor $doctorPath
-    Write-Host ('Installed: Shumo-MAXx ' + $version)
-    Write-Host 'Doctor passed: MAXx, the Huawei Cup audit layer, and the bundled base suite are complete.'
+    catch {
+        $registrationError = $_.Exception.Message
+        $restored = $false
+        if ($previousMarketplaceRoot -and (Test-Path -LiteralPath $previousMarketplaceRoot -PathType Container)) {
+            try {
+                if ($newMarketplaceAdded) { & codex plugin marketplace remove 'zyh-mathmodel-private' }
+                & codex plugin marketplace add $previousMarketplaceRoot
+                if ($LASTEXITCODE -eq 0) {
+                    & codex plugin add 'math-modeling-championship-max@zyh-mathmodel-private'
+                    $restored = $LASTEXITCODE -eq 0
+                }
+            }
+            catch { $restored = $false }
+        }
+        Write-InstallJson (Join-Path $installRoot 'registration-failure.json') ([ordered]@{status='FAIL';error=$registrationError;previous_marketplace_restored=$restored})
+        throw ('Plugin registration failed. Previous marketplace restored: ' + $restored + '. Details: ' + (Join-Path $installRoot 'registration-failure.json'))
+    }
+    $maxxRoot = Join-Path $installRoot 'plugins\math-modeling-championship-max\skills\math-modeling-championship-maxx'
+    $runtimeStatus = 'NOT_REQUESTED'
+    $runtimeReportPath = $null
+    if ($PythonPath) { $env:MATHMODEL_PYTHON = $PythonPath }
+    if ($SetupRuntime) {
+        $runtimeReportPath = Join-Path $installRoot 'runtime-setup.json'
+        try {
+            $runtimePython = Find-RealPython
+            if (-not $runtimePython) { throw 'No usable Python was found. Install Python 3.11+ or supply -PythonPath.' }
+            $runtimeJson = (& $runtimePython -I (Join-Path $maxxRoot 'scripts\bootstrap_runtime.py') --profile $RuntimeProfile | Out-String)
+            $runtimeExitCode = $LASTEXITCODE
+            $runtimeReport = $runtimeJson | ConvertFrom-Json
+            if ($null -eq $runtimeReport) { throw 'Python setup returned no JSON report.' }
+            Write-InstallJson $runtimeReportPath $runtimeReport
+            if ($runtimeExitCode -eq 0 -and $runtimeReport.status -eq 'VERIFIED' -and $runtimeReport.execution_verified -eq $true -and (Test-Path -LiteralPath $runtimeReport.python -PathType Leaf)) {
+                $runtimeStatus = 'VERIFIED'
+                $env:MATHMODEL_PYTHON = $runtimeReport.python
+            }
+            else {
+                $runtimeStatus = 'FAILED'
+                Write-Warning 'Python dependency setup failed; inspect its retained report and DEPENDENCIES.md.'
+            }
+        }
+        catch {
+            $runtimeStatus = 'FAILED'
+            Write-InstallJson $runtimeReportPath ([ordered]@{status='NOT_READY';execution_verified=$false;error=$_.Exception.Message})
+            Write-Warning 'Could not complete Python setup; plugin files remain installed. See runtime-setup.json and DEPENDENCIES.md.'
+        }
+    }
+    $doctorPath = Join-Path $maxxRoot 'scripts\max_doctor.ps1'
+    $doctorOutputPath = Join-Path $installRoot 'maxx-install-doctor.json'
+    $doctorReport = $null
+    try {
+        $doctorJson = (& powershell -NoProfile -ExecutionPolicy Bypass -File $doctorPath -Delivery $Delivery -Profile championship -Output $doctorOutputPath | Out-String)
+        $doctorExitCode = $LASTEXITCODE
+        if (Test-Path -LiteralPath $doctorOutputPath -PathType Leaf) {
+            $doctorReport = Get-Content -LiteralPath $doctorOutputPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($doctorJson)) {
+            $doctorReport = $doctorJson | ConvertFrom-Json
+            Write-InstallJson $doctorOutputPath $doctorReport
+        }
+    }
+    catch { $doctorExitCode = 1 }
+    if ($null -eq $doctorReport) {
+        $doctorReport = [pscustomobject]@{ready=$false;blocking_failures=@('doctor:no_valid_report')}
+        Write-InstallJson $doctorOutputPath $doctorReport
+    }
+    $ready = $doctorExitCode -eq 0 -and $null -ne $doctorReport -and $doctorReport.ready -eq $true -and @($doctorReport.blocking_failures).Count -eq 0
+    if ($SetupRuntime -and $runtimeStatus -ne 'VERIFIED') { $ready = $false }
+    $state = [ordered]@{
+        plugin_installed = $true
+        version = $version
+        environment_ready = $ready
+        delivery = $Delivery
+        requested_runtime_profile = $(if ($SetupRuntime) { $RuntimeProfile } else { $null })
+        runtime_setup = $runtimeStatus
+        runtime_verified = ($runtimeStatus -eq 'VERIFIED')
+        runtime_report = $runtimeReportPath
+        doctor_report = $doctorOutputPath
+        installation_guide = (Join-Path $maxxRoot 'references\external-installation.md')
+        external_account_connections_verified = $false
+        all_optional_applications_executed = $false
+    }
+    Write-InstallJson (Join-Path $installRoot 'installation-state.json') $state
+    Write-Host ('Plugin installed: Shumo-MAXx ' + $version)
+    Write-Host ('Installation guide: ' + $state.installation_guide)
+    Write-Host ('Readiness report: ' + $doctorOutputPath)
+    if ($ready) {
+        Write-Host 'Doctor passed for the selected delivery. Optional applications and account connections require their own checks.'
+    }
+    else {
+        Write-Warning 'Plugin installed; environment is INCOMPLETE. Follow the readiness report and installation guide to enable missing capabilities.'
+    }
     Write-Host 'Create a new Codex task before using the updated plugin.'
+    if (-not $ready) { exit 2 }
 }
 finally {
     $resolvedWork = [IO.Path]::GetFullPath($workRoot)

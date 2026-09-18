@@ -28,6 +28,11 @@ $canonicalManifest = Join-Path $canonicalResolved '.codex-plugin\plugin.json'
 if (-not (Test-Path -LiteralPath $canonicalManifest -PathType Leaf)) {
     throw ('Canonical plugin manifest is missing: ' + $canonicalManifest)
 }
+$dependencyGuide = Join-Path $canonicalResolved 'skills\math-modeling-championship-maxx\references\external-installation.md'
+if (-not (Test-Path -LiteralPath $dependencyGuide -PathType Leaf)) {
+    throw 'The recipient dependency installation guide is missing.'
+}
+Copy-Item -LiteralPath $dependencyGuide -Destination (Join-Path $root 'DEPENDENCIES.md') -Force
 
 # Rebuild the encrypted marketplace from the canonical plugin every time so an
 # old ignored build directory can never silently become the invited release.
