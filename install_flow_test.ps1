@@ -121,6 +121,29 @@ function Write-Fixture([string]$RelativePath, [string]$Content) {
     [IO.File]::WriteAllText($path, $Content, [Text.UTF8Encoding]::new($false))
 }
 
+function Write-TestPayload([string]$ZipPath, [string]$PayloadPath) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $key = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($testCode))
+        $auth = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes('auth:' + $testCode))
+    } finally { $sha.Dispose() }
+    $aes = [Security.Cryptography.Aes]::Create()
+    try {
+        $aes.Key = $key
+        $aes.GenerateIV()
+        $encryptor = $aes.CreateEncryptor()
+        try {
+            $plain = [IO.File]::ReadAllBytes($ZipPath)
+            $cipher = $encryptor.TransformFinalBlock($plain, 0, $plain.Length)
+        } finally { $encryptor.Dispose() }
+        [byte[]]$prefix = [Text.Encoding]::ASCII.GetBytes('MMCMAX1') + $aes.IV + $cipher
+    } finally { $aes.Dispose() }
+    $hmac = New-Object Security.Cryptography.HMACSHA256(,$auth)
+    try { [byte[]]$payload = $prefix + $hmac.ComputeHash($prefix) }
+    finally { $hmac.Dispose() }
+    [IO.File]::WriteAllBytes($PayloadPath, $payload)
+}
+
 function Invoke-Case([string]$Name, [string]$Directory) {
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $shell
@@ -165,7 +188,7 @@ try {
     foreach ($name in @('math-modeling-championship-maxx', 'math-modeling-championship-max', 'math-modeling-championship')) {
         Write-Fixture ($plugin + '\skills\' + $name + '\SKILL.md') ('---' + "`nname: " + $name + "`ndescription: Synthetic installer fixture.`n---`nFixture only.")
     }
-    foreach ($name in @('huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py')) {
+    foreach ($name in @('huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py', 'render_flowcharts.py', 'presentation_audit.py')) {
         Write-Fixture ($maxx + '\scripts\' + $name) '# Synthetic required-entrypoint fixture; not a functional model.'
     }
     foreach ($name in @('doctor.py', 'state_manager.py')) {
@@ -173,6 +196,12 @@ try {
     }
     Write-Fixture ($maxx + '\references\runtime-profiles.json') '{"fixture":true}'
     Write-Fixture ($maxx + '\references\external-installation.md') '# Synthetic installation guide'
+    foreach ($name in @('flowchart-spec-example.json', 'presentation-manifest-template.json')) {
+        Write-Fixture ($maxx + '\references\' + $name) '{"fixture":true}'
+    }
+    foreach ($name in @('presentation-contract.md', 'presentation-workflow.md')) {
+        Write-Fixture ($maxx + '\references\' + $name) '# Synthetic presentation requirements'
+    }
     Write-Fixture ($maxx + '\scripts\bootstrap_runtime.py') @'
 import json, os, sys
 failed = os.environ.get("MAXX_TEST_BOOTSTRAP") == "bootstrap-failed"
@@ -196,27 +225,8 @@ exit 0
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = Join-Path $FixtureRoot 'fixture.zip'
     [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $FixtureRoot 'marketplace'), $zip)
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try {
-        $key = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($testCode))
-        $auth = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes('auth:' + $testCode))
-    } finally { $sha.Dispose() }
-    $aes = [Security.Cryptography.Aes]::Create()
-    try {
-        $aes.Key = $key
-        $aes.GenerateIV()
-        $encryptor = $aes.CreateEncryptor()
-        try {
-            $plain = [IO.File]::ReadAllBytes($zip)
-            $cipher = $encryptor.TransformFinalBlock($plain, 0, $plain.Length)
-        } finally { $encryptor.Dispose() }
-        [byte[]]$prefix = [Text.Encoding]::ASCII.GetBytes('MMCMAX1') + $aes.IV + $cipher
-    } finally { $aes.Dispose() }
-    $hmac = New-Object Security.Cryptography.HMACSHA256(,$auth)
-    try { [byte[]]$payload = $prefix + $hmac.ComputeHash($prefix) }
-    finally { $hmac.Dispose() }
     New-Item -ItemType Directory -Path (Join-Path $FixtureRoot 'payload') | Out-Null
-    [IO.File]::WriteAllBytes((Join-Path $FixtureRoot 'payload\plugin-marketplace.aes'), $payload)
+    Write-TestPayload $zip (Join-Path $FixtureRoot 'payload\plugin-marketplace.aes')
 
     $case = Join-Path $testRoot 'v'
     $run = Invoke-Case 'verify-only' $case
@@ -281,6 +291,32 @@ exit 0
     Assert-Test ((Get-Content -LiteralPath (Join-Path $case 'mock-marketplace.txt') -Encoding UTF8 -Raw) -eq $secondRoot) 'Codex mock did not switch to the new installation.'
     Assert-Test ((Get-Content -LiteralPath (Join-Path $case 'codex-calls.txt') -Encoding UTF8 -Raw) -match 'plugin marketplace remove zyh-mathmodel-private') 'Repeated installation did not replace the marketplace registration.'
     $results.Add([pscustomobject]@{ test = 'same-version repeated installation preserves old files and avoids nesting'; status = 'PASS' })
+
+    # A correctly authenticated package must still be rejected if a new critical
+    # presentation feature is absent. Use a separate fixture, not real files.
+    $completeFixture = $FixtureRoot
+    $incompleteFixture = Join-Path $testRoot 'bad'
+    New-Item -ItemType Directory -Path (Join-Path $incompleteFixture 'payload') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $completeFixture 'install.ps1') -Destination (Join-Path $incompleteFixture 'install.ps1')
+    $incompleteZip = Join-Path $incompleteFixture 'fixture.zip'
+    Copy-Item -LiteralPath $zip -Destination $incompleteZip
+    $archive = [IO.Compression.ZipFile]::Open($incompleteZip, [IO.Compression.ZipArchiveMode]::Update)
+    try {
+        $missingPath = 'plugins/math-modeling-championship-max/skills/math-modeling-championship-maxx/scripts/render_flowcharts.py'
+        $entry = @($archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq $missingPath })
+        Assert-Test ($entry.Count -eq 1) 'Negative fixture must remove exactly one critical presentation file.'
+        $entry[0].Delete()
+    } finally { $archive.Dispose() }
+    Write-TestPayload $incompleteZip (Join-Path $incompleteFixture 'payload\plugin-marketplace.aes')
+    $FixtureRoot = $incompleteFixture
+    $case = Join-Path $testRoot 'n'
+    try { $run = Invoke-Case 'healthy' $case }
+    finally { $FixtureRoot = $completeFixture }
+    Assert-Test ($run.ExitCode -ne 0 -and $run.ExitCode -ne 2) ('Missing critical feature was not rejected before installation: ' + $run.Output)
+    Assert-Test ($run.Output -match 'The decrypted package is incomplete' -and $run.Output -match 'render_flowcharts.py') 'Missing-feature error did not identify the incomplete package and absent file.'
+    Assert-Test (@(Get-InstallRoots $case).Count -eq 0) 'Incomplete presentation package left an installation directory.'
+    Assert-Test (-not (Test-Path -LiteralPath (Join-Path $case 'codex-calls.txt'))) 'Incomplete presentation package reached Codex registration.'
+    $results.Add([pscustomobject]@{ test = 'missing render_flowcharts.py rejects authenticated package before installation'; status = 'PASS' })
 
     $report = [pscustomobject]@{
         status = 'PASS'
