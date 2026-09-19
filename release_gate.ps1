@@ -71,10 +71,19 @@ try {
 
     $env:MAXX_TEST_INVITE_CODE = $InviteCode
     try {
+        # unittest writes progress to stderr even when every test passes. Windows
+        # PowerShell turns that benign stream into NativeCommandError under Stop.
+        $previousErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         & $PythonPath -I $crossInstallerTest *> $null
-        if ($LASTEXITCODE -ne 0) { throw 'Cross-platform installer tests failed against the published payload.' }
+        $crossTestExit = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorAction
+        if ($crossTestExit -ne 0) { throw 'Cross-platform installer tests failed against the published payload.' }
     }
-    finally { Remove-Item Env:MAXX_TEST_INVITE_CODE -ErrorAction SilentlyContinue }
+    finally {
+        $ErrorActionPreference = 'Stop'
+        Remove-Item Env:MAXX_TEST_INVITE_CODE -ErrorAction SilentlyContinue
+    }
 
     $previousErrorAction = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
