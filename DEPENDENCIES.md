@@ -1,16 +1,16 @@
 # 数模-MAXx：受邀者安装与完整能力接通说明
 
-适用：受邀者自己的 Codex、电脑和账号；默认华为杯赛前演练。核对日期：2026-09-18。
+适用：受邀者自己的 Codex、电脑和账号；默认华为杯赛前演练。核对日期：2026-09-19。
 
 完整邀请包包含 MAXx 总控、基础建模流程、随包技能、审计程序、模板和本说明。Python 库、Word/LibreOffice、LaTeX、MATLAB 等程序，以及 Wolfram、SciSpace 的账号连接需在接收者环境准备。下表把每个能力家族对应到实际运行条件；没有选用的专业应用不会阻断基础流程，但不能把其状态写成“已全部验证”。
 
 ## 1. 发给受邀者的完整指令
 
-把收到的**完整邀请链接（保留末尾 `#invite=...`）**与以下文字一起发给 Codex：
+把收到的**完整邀请链接（保留末尾 `#invite=...`）**和发送者另列的**邀请码**一起以纯文本发给 Codex。邀请码是链接中 `#invite=` 后的同一串字符；两种输入互为备用，不要把口令提交到公开仓库、工单或日志：
 
-> 请用这个完整邀请链接安装或更新“数模-MAXx”。从邀请仓库全新克隆，按仓库安装说明启用 SetupRuntime、extended 环境和 word 交付配置。使用我本机的真实 Python，准备独立环境，保留安装与依赖检查回执。读取插件内 external-installation.md，检查下表的全部能力家族：配置基础数值、建模、代码绘图、文档/PDF 和审计功能；按题型准备可选应用，并在宿主实际支持的插件搜索/连接流程中检查 Wolfram 和 SciSpace。对需要我完成的登录、授权或许可证操作给出准确入口；连接完成后用公开合成示例验证。运行 Doctor、集成冒烟检查，并分别报告已通过、采用替代路线、待连接、未实测和失败项，不把“找到安装路径”当作“可执行”。保留外部功能安装说明和后续修复命令；完成后提示我重启 Codex 并新建任务加载新版。
+> 请用这条完整邀请链接安装或更新“数模-MAXx”；若任务记录中没有完整 URL 或 `#invite=` 被截断，就使用我同时提供的单独邀请码。从邀请仓库全新克隆，按仓库安装说明启用 SetupRuntime、extended 环境和 both 交付配置。使用我本机的真实 Python，准备独立环境，保留安装与依赖检查回执。读取插件内 external-installation.md，检查下表的全部能力家族：配置基础数值、建模、代码绘图、文档/PDF 和审计功能；按题型准备可选应用，并在宿主实际支持的插件搜索/连接流程中检查 Wolfram 和 SciSpace。对需要我完成的登录、授权或许可证操作给出准确入口；连接完成后用公开合成示例验证。运行 Doctor、集成冒烟检查，并分别报告已通过、采用替代路线、待连接、未实测和失败项，不把“找到安装路径”当作“可执行”。保留外部功能安装说明和后续修复命令；完成后提示我重启 Codex 并新建任务加载新版。
 
-安装入口以[邀请仓库说明](https://github.com/zyh051128-beep/math-modeling-championship-max-invite)为准。现有用户也用同一完整链接重新安装；无需访问所有者私有仓库。不要使用发件人电脑上的 `marketplacePath` 或 Python 绝对路径。
+安装入口以[邀请仓库说明](https://github.com/zyh051128-beep/math-modeling-championship-max-invite)为准。现有用户使用发送者当前提供的完整链接或单独邀请码重新安装；口令轮换后旧链接不能解密新载荷。无需访问所有者私有仓库，也不要使用发件人电脑上的 `marketplacePath` 或 Python 绝对路径。
 
 Windows 手工执行时，先安装 [Git](https://git-scm.com/downloads/) 并确认 `git --version` 成功。邀请安装器还要求当前 PowerShell 能通过 `Get-Command codex` 找到官方 Codex CLI，并成功执行下面两项预检；桌面程序能打开不证明 CLI 已加入当前 PATH。
 
@@ -28,10 +28,24 @@ if ($LASTEXITCODE -ne 0) { throw 'NOT_READY: 当前 Codex CLI 不支持邀请安
 $maxxDownload = Join-Path $env:TEMP ('shumo-maxx-invite-' + [guid]::NewGuid().ToString('N'))
 git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git $maxxDownload
 if ($LASTEXITCODE -ne 0) { throw '邀请仓库下载失败，请修复网络后重试。' }
-& (Join-Path $maxxDownload 'install.ps1') -InviteUrl '<粘贴完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery word
+# 首选完整链接；若聊天软件截断 #invite=，改用下一行的 -InviteCode。
+& (Join-Path $maxxDownload 'install.ps1') -InviteUrl '<粘贴完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery both
+& (Join-Path $maxxDownload 'install.ps1') -InviteCode '<粘贴单独邀请码>' -SetupRuntime -RuntimeProfile extended -Delivery both
 ```
 
-如 PowerShell 的执行策略阻止脚本，交给 Codex 按当前设备/组织策略处理；不要关闭系统安全功能。安装器是 Windows 路线。macOS/Linux 用户须由 Codex 根据当前宿主支持的插件安装方式完成安装，不能把 Windows 安装器已验证当作跨平台验证。
+如 PowerShell 的执行策略阻止脚本，交给 Codex 按当前设备/组织策略处理；不要关闭系统安全功能。
+
+macOS/Linux使用公开仓库中的跨平台入口。先确认`git`、Codex CLI和Python 3.11+可以运行，再从全新临时目录执行；Apple Silicon与Intel使用同一脚本：
+
+```bash
+if ! command -v codex >/dev/null 2>&1; then echo 'NOT_READY: 当前终端找不到Codex CLI'; exit 2; fi
+codex --version && codex plugin --help
+maxx_download="$(mktemp -d "${TMPDIR:-/tmp}/shumo-maxx-invite.XXXXXX")"
+git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git "$maxx_download"
+"$maxx_download/install.sh" --invite-code '<粘贴单独邀请码>' --setup-runtime --runtime-profile extended --delivery both
+```
+
+也可把最后一行改成`--invite-url '<完整邀请链接>'`。跨平台安装器会验证相同的加密载荷、注册同一插件市场、建立隔离Python环境并运行同一Doctor。它不调用Windows PowerShell。macOS上的自动DOCX→PDF路线使用LibreOffice；Microsoft Word for Mac仍可用于人工编辑和审阅，但当前自动导出器不调用Mac版Word。LibreOffice、XeLaTeX/Pandoc、MATLAB及在线账号按本说明逐项准备并实跑。
 
 ## 2. 基础环境与 Python 库
 
@@ -136,7 +150,8 @@ Wolfram与SciSpace没有在本插件中嵌入共享账号、API密钥或第三�
 
 | 现象 | 处理 |
 |---|---|
-| 邀请链接可打开但无法解密 | 检查完整链接是否保留`#invite=`片段；从新临时目录重新克隆。口令验证失败时不尝试绕过，也不把口令写入公开问题报告 |
+| 邀请链接在聊天/任务记录中丢失或无法解密 | 检查消息是否真的包含 URL 及末尾`#invite=`；若片段被截断，使用发送者同条消息中的单独邀请码。Windows用`-InviteCode`，macOS/Linux用`--invite-code`。从新临时目录重新克隆；不把口令写入公开问题报告或仓库 |
+| macOS提示不能运行Windows安装器 | 改用邀请仓库中的`install.sh`/`install.py`跨平台入口；安装后按报告准备LibreOffice和LaTeX。Mac版Word可人工编辑，自动PDF导出走明确的LibreOffice路线 |
 | 更新后仍加载旧版本 | 保留安装回执，完全退出并重开Codex、新建任务；检查实际加载技能路径/版本。不要反复覆盖正在使用的缓存目录 |
 | `python`跳转商店/找不到模块 | 使用真实解释器绝对路径；所有安装都用该路径的`-m pip`。核对环境回执，而非改用系统另一个pip |
 | 桌面Codex可打开，但安装器找不到`codex` | 先完成第1节的CLI路径、`codex --version`和`codex plugin --help`预检；未通过为`NOT_READY`。使用宿主官方CLI或官方文档，不从无关第三方安装同名程序 |

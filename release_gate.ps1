@@ -3,7 +3,9 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$InviteCode,
 
-    [string]$RepositoryUrl = 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git'
+    [string]$RepositoryUrl = 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git',
+
+    [string]$PythonPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,8 +15,17 @@ $cloneRoot = Join-Path $testRoot 'anonymous-clone'
 try {
     New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
     $env:GIT_TERMINAL_PROMPT = '0'
-    & git -c credential.helper= clone --depth 1 $RepositoryUrl $cloneRoot
+    & git -c credential.helper= clone $RepositoryUrl $cloneRoot
     if ($LASTEXITCODE -ne 0) { throw 'Anonymous clone of the public repository failed.' }
+
+    $trackedLeak = & git -C $cloneRoot grep -I -F -l -- $InviteCode 2>$null
+    if ($LASTEXITCODE -eq 0 -or $trackedLeak) { throw 'The invitation code appears in the public tracked tree.' }
+    if ($LASTEXITCODE -notin @(0, 1)) { throw 'Could not scan the public tracked tree for invitation-code leakage.' }
+    $historyText = (& git -C $cloneRoot log --all -p --format=fuller | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw 'Could not scan public Git history for invitation-code leakage.' }
+    if ($historyText.IndexOf($InviteCode, [StringComparison]::Ordinal) -ge 0) {
+        throw 'The invitation code appears in public Git history.'
+    }
 
     $payloadPath = Join-Path $cloneRoot 'payload\plugin-marketplace.aes'
     $shaPath = Join-Path $cloneRoot 'payload\SHA256.txt'
@@ -26,9 +37,60 @@ try {
     if ($expectedSha -ne $actualSha) { throw 'The encrypted package checksum does not match.' }
 
     $installerPath = Join-Path $cloneRoot 'install.ps1'
+    $crossInstallerPath = Join-Path $cloneRoot 'install.py'
+    $crossInstallerTest = Join-Path $cloneRoot 'test_install_py.py'
+    $shellInstallerPath = Join-Path $cloneRoot 'install.sh'
+    foreach ($required in @($installerPath, $crossInstallerPath, $crossInstallerTest, $shellInstallerPath)) {
+        if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw ('A required installer is missing: ' + [IO.Path]::GetFileName($required)) }
+    }
+    if ([string]::IsNullOrWhiteSpace($PythonPath)) {
+        $pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+        if (-not $pythonCommand) { $pythonCommand = Get-Command python -ErrorAction SilentlyContinue }
+        if ($pythonCommand) { $PythonPath = $pythonCommand.Source }
+    }
+    if ([string]::IsNullOrWhiteSpace($PythonPath) -or -not (Test-Path -LiteralPath $PythonPath -PathType Leaf)) {
+        throw 'Cross-platform release verification requires a real Python 3.11+ executable via -PythonPath.'
+    }
     $invitePage = ($RepositoryUrl -replace '\.git$', '') + '#invite=' + [Uri]::EscapeDataString($InviteCode)
     & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $invitePage -VerifyOnly
     if ($LASTEXITCODE -ne 0) { throw 'The valid invitation code failed verification.' }
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteCode $InviteCode -VerifyOnly
+    if ($LASTEXITCODE -ne 0) { throw 'The direct invitation-code fallback failed verification.' }
+
+    $queryInvitePage = ($RepositoryUrl -replace '\.git$', '') + '?invite=' + [Uri]::EscapeDataString($InviteCode)
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $queryInvitePage -VerifyOnly
+    if ($LASTEXITCODE -ne 0) { throw 'The query-form invitation fallback failed verification.' }
+
+    & $PythonPath -I $crossInstallerPath --invite-url $invitePage --verify-only *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'The cross-platform installer failed fragment-link verification.' }
+    & $PythonPath -I $crossInstallerPath --invite-url $queryInvitePage --verify-only *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'The cross-platform installer failed query-link verification.' }
+    & $PythonPath -I $crossInstallerPath --invite-code $InviteCode --verify-only *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'The cross-platform installer failed direct-code verification.' }
+
+    $env:MAXX_TEST_INVITE_CODE = $InviteCode
+    try {
+        & $PythonPath -I $crossInstallerTest *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'Cross-platform installer tests failed against the published payload.' }
+    }
+    finally { Remove-Item Env:MAXX_TEST_INVITE_CODE -ErrorAction SilentlyContinue }
+
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $fragmentMissingPage = ($RepositoryUrl -replace '\.git$', '')
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $fragmentMissingPage -VerifyOnly *> $null
+    $fragmentMissingExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorAction
+    if ($fragmentMissingExit -eq 0) { throw 'A URL without invitation credentials was incorrectly accepted.' }
+
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $conflictingPage = $invitePage + '&invite=conflicting-value'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $conflictingPage -VerifyOnly *> $null
+    $conflictingExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorAction
+    if ($conflictingExit -eq 0) { throw 'Conflicting invitation values were incorrectly accepted.' }
 
     $wrongCode = 'invalid-' + [guid]::NewGuid().ToString('N')
     $previousErrorAction = $ErrorActionPreference
@@ -38,6 +100,13 @@ try {
     $wrongCodeExit = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorAction
     if ($wrongCodeExit -eq 0) { throw 'An invalid invitation code was not rejected.' }
+
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & $PythonPath -I $crossInstallerPath --invite-code $wrongCode --verify-only *> $null
+    $crossWrongCodeExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorAction
+    if ($crossWrongCodeExit -eq 0) { throw 'The cross-platform installer did not reject an invalid invitation code.' }
 
     $readme = Get-Content -LiteralPath (Join-Path $cloneRoot 'README.md') -Raw -Encoding UTF8
     $codexInstallPath = Join-Path $cloneRoot 'CODEX_INSTALL.md'
@@ -56,7 +125,7 @@ try {
     if ($troubleshooting -match 'marketplacePath=|C:\\Users\\') { throw 'TROUBLESHOOTING.md leaks or depends on a sender-local path.' }
     if ($dependencies -match 'marketplacePath=|C:\\Users\\') { throw 'DEPENDENCIES.md leaks or depends on a sender-local path.' }
 
-    Write-Host 'Release gate passed: anonymous clone, checksum, valid-code decrypt, and invalid-code rejection.'
+    Write-Host 'Release gate passed: anonymous clone, public-history leak scan, Windows and cross-platform fragment/query/direct-code verification, credential rejection, and installer tests.'
     $global:LASTEXITCODE = 0
 }
 finally {

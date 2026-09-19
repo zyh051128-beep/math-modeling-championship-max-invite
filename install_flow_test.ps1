@@ -1,7 +1,7 @@
 param(
     [string]$PythonPath,
     [string]$ReportPath,
-    [ValidateSet('', 'verify-only', 'bootstrap-failed', 'bootstrap-start-failed', 'doctor-invalid', 'healthy')]
+    [ValidateSet('', 'verify-only', 'verify-fragment', 'verify-query', 'verify-missing', 'verify-conflict', 'verify-case-mismatch', 'bootstrap-failed', 'bootstrap-start-failed', 'doctor-invalid', 'healthy')]
     [string]$ChildCase = '',
     [string]$CaseRoot,
     [string]$FixtureRoot
@@ -30,14 +30,38 @@ if ($ChildCase) {
     $env:MAXX_TEST_BOOTSTRAP = $ChildCase
     $env:MAXX_TEST_CASE_ROOT = $CaseRoot
 
-    if ($ChildCase -eq 'verify-only') {
+    if ($ChildCase -like 'verify-*') {
         foreach ($command in @('python', 'python.exe', 'codex', 'winword', 'winword.exe')) {
             if (Get-Command $command -ErrorAction SilentlyContinue) {
                 throw ('Isolation failed: command remains available: ' + $command)
             }
         }
-        & (Join-Path $FixtureRoot 'install.ps1') -InviteCode $testCode -VerifyOnly
-        exit 0
+        switch ($ChildCase) {
+            'verify-only' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteCode $testCode -VerifyOnly
+                exit $LASTEXITCODE
+            }
+            'verify-fragment' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteUrl ('https://example.invalid/repo#invite=' + [Uri]::EscapeDataString($testCode)) -VerifyOnly
+                exit $LASTEXITCODE
+            }
+            'verify-query' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteUrl ('https://example.invalid/repo?invite=' + [Uri]::EscapeDataString($testCode)) -VerifyOnly
+                exit $LASTEXITCODE
+            }
+            'verify-missing' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteUrl 'https://example.invalid/repo' -VerifyOnly
+                exit $(if ($?) { 0 } else { 1 })
+            }
+            'verify-conflict' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteUrl ('https://example.invalid/repo?invite=' + $testCode + '#invite=conflicting-value') -VerifyOnly
+                exit $(if ($?) { 0 } else { 1 })
+            }
+            'verify-case-mismatch' {
+                & (Join-Path $FixtureRoot 'install.ps1') -InviteCode $testCode.ToLowerInvariant() -InviteUrl ('https://example.invalid/repo#invite=' + $testCode) -VerifyOnly
+                exit $(if ($?) { 0 } else { 1 })
+            }
+        }
     }
 
     function global:codex {
@@ -234,6 +258,21 @@ exit 0
     Assert-Test ($run.Output -match 'Invitation package verified') 'VerifyOnly did not actually verify the package.'
     Assert-Test (@(Get-InstallRoots $case).Count -eq 0) 'VerifyOnly installed plugin files.'
     $results.Add([pscustomobject]@{ test = 'VerifyOnly without Python, Codex, or Word commands'; status = 'PASS' })
+
+    foreach ($variant in @('verify-fragment', 'verify-query')) {
+        $case = Join-Path $testRoot $variant
+        $run = Invoke-Case $variant $case
+        Assert-Test ($run.ExitCode -eq 0 -and $run.Output -match 'Invitation package verified') ($variant + ' did not verify the authenticated package: ' + $run.Output)
+        Assert-Test (@(Get-InstallRoots $case).Count -eq 0) ($variant + ' installed plugin files during VerifyOnly.')
+        $results.Add([pscustomobject]@{ test = ($variant + ' URL transport verifies without installation'); status = 'PASS' })
+    }
+    foreach ($variant in @('verify-missing', 'verify-conflict', 'verify-case-mismatch')) {
+        $case = Join-Path $testRoot $variant
+        $run = Invoke-Case $variant $case
+        Assert-Test ($run.ExitCode -ne 0) ($variant + ' was incorrectly accepted: ' + $run.Output)
+        Assert-Test (@(Get-InstallRoots $case).Count -eq 0) ($variant + ' left plugin files behind.')
+        $results.Add([pscustomobject]@{ test = ($variant + ' credentials are rejected'); status = 'PASS' })
+    }
 
     $caseIndex = 0
     foreach ($name in @('bootstrap-failed', 'bootstrap-start-failed', 'doctor-invalid')) {

@@ -6,7 +6,21 @@
 
 原因：安装过程复用了旧克隆、旧下载缓存或旧解密目录。
 
-处理：为本次安装创建新的随机临时目录，重新匿名克隆邀请仓库，再把完整邀请 URL 传给 `install.ps1 -InviteUrl`。不要在旧目录直接重复运行。
+处理：为本次安装创建新的随机临时目录，重新匿名克隆邀请仓库。Windows把完整邀请URL传给`install.ps1 -InviteUrl`；macOS/Linux传给`install.sh --invite-url`。若当前消息没有URL或`#invite=`被截断，使用发送者同条消息里的单独邀请码：Windows用`-InviteCode`，macOS/Linux用`--invite-code`。不要在旧目录直接重复运行。
+
+## 当前消息或附件里没有邀请链接
+
+症状：Codex明确报告当前消息、任务记录和附件中均没有URL。
+
+原因：转发时只复制了安装说明，完整裸URL没有进入同一段可复制文本，或聊天软件截断了`#invite=`片段。
+
+处理：请发送者在同一条纯文本消息中同时放入完整裸URL、公开仓库URL、单独邀请码和安装指令。收到方优先使用公共仓库URL配合单独邀请码，不依赖聊天软件保留URL片段。
+
+## macOS提示不能运行Windows安装器
+
+症状：设备为Apple Silicon或Intel macOS，无法执行`install.ps1`。
+
+处理：从全新目录克隆仓库，执行`install.sh --invite-code '<邀请码>' --setup-runtime --runtime-profile extended --delivery both`。安装报告若列出LibreOffice、XeLaTeX、Pandoc、MATLAB或在线账号缺口，按`DEPENDENCIES.md`补齐后重新运行Doctor；插件文件安装成功与外部应用就绪分别记录。
 
 ## Windows 沙箱程序拒绝访问
 

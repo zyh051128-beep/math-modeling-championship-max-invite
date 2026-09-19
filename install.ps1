@@ -22,24 +22,34 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $OutputEncoding = [Console]::OutputEncoding
 
-if ([string]::IsNullOrWhiteSpace($InviteCode) -and -not [string]::IsNullOrWhiteSpace($InviteUrl)) {
+if (-not [string]::IsNullOrWhiteSpace($InviteUrl)) {
     try {
         $inviteUri = [Uri]$InviteUrl
-        $fragment = $inviteUri.Fragment.TrimStart('#')
-        foreach ($part in ($fragment -split '&')) {
-            $pair = $part -split '=', 2
-            if ($pair.Length -eq 2 -and $pair[0] -eq 'invite') {
-                $InviteCode = [Uri]::UnescapeDataString($pair[1])
-                break
+        $urlCodes = @()
+        foreach ($component in @($inviteUri.Fragment.TrimStart('#'), $inviteUri.Query.TrimStart('?'))) {
+            foreach ($part in ($component -split '&')) {
+                $pair = $part -split '=', 2
+                if ($pair.Length -eq 2 -and $pair[0] -eq 'invite') {
+                    $decoded = [Uri]::UnescapeDataString($pair[1])
+                    if (-not [string]::IsNullOrWhiteSpace($decoded)) { $urlCodes += $decoded }
+                }
             }
+        }
+        $uniqueUrlCodes = @($urlCodes | Select-Object -Unique)
+        if ($uniqueUrlCodes.Count -gt 1) { throw 'The invitation URL contains conflicting invite values.' }
+        if ($uniqueUrlCodes.Count -eq 1) {
+            if (-not [string]::IsNullOrWhiteSpace($InviteCode) -and $InviteCode -cne $uniqueUrlCodes[0]) {
+                throw 'InviteUrl and InviteCode contain different invitation credentials.'
+            }
+            if ([string]::IsNullOrWhiteSpace($InviteCode)) { $InviteCode = $uniqueUrlCodes[0] }
         }
     }
     catch {
-        throw 'The supplied invitation URL is not valid.'
+        throw ('The supplied invitation URL is not valid or has conflicting credentials: ' + $_.Exception.Message)
     }
 }
 if ([string]::IsNullOrWhiteSpace($InviteCode)) {
-    throw 'Supply either -InviteUrl with the complete invitation link or -InviteCode with the invitation code.'
+    throw 'No invitation credential was found. Supply -InviteUrl with #invite= (preferred) or ?invite=, or use -InviteCode with the separately supplied invitation code.'
 }
 
 $payloadPath = Join-Path $PSScriptRoot 'payload\plugin-marketplace.aes'
