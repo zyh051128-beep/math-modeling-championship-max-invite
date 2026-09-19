@@ -16,6 +16,10 @@ def find_libreoffice():
             candidates.append(str(Path(os.environ[variable]) / 'LibreOffice/program/soffice.exe'))
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
+            # Windows GUI launcher may not return console --version output.
+            console = Path(candidate).with_suffix('.com')
+            if sys.platform == 'win32' and console.is_file():
+                return str(console.resolve())
             return str(Path(candidate).resolve())
     raise RuntimeError('LibreOffice executable was not found in PATH or standard application folders.')
 
@@ -49,4 +53,18 @@ def run(skill_root, root):
                       'boundary':'Synthetic editable DOCX actually converted by LibreOffice; visual fidelity of future papers remains subject to per-formula and per-page audit.'}))
 
 if __name__ == '__main__':
-    run(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve())
+    try:
+        run(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve())
+    except Exception as exc:
+        # Only known classifications; never emit private source/tracebacks.
+        known = {
+            'LibreOffice executable was not found': 'OFFICE_NOT_FOUND',
+            'LibreOffice requires an explicitly supplied': 'ABSOLUTE_EXECUTABLE_REQUIRED',
+            'did not identify itself as LibreOffice': 'OFFICE_VERSION_IDENTITY',
+            'LibreOffice timed out': 'OFFICE_TIMEOUT',
+            'LibreOffice did not produce': 'OFFICE_NO_OUTPUT',
+            'Exported PDF contains no searchable text': 'PDF_NO_SEARCHABLE_TEXT',
+        }
+        diagnostic = next((label for token, label in known.items() if token in str(exc)), 'UNCLASSIFIED')
+        print(json.dumps({'status':'FAIL', 'diagnostic':diagnostic}))
+        raise SystemExit(1)

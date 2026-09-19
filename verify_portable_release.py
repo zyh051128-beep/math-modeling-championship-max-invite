@@ -91,7 +91,13 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                     str(installed / 'plugins' / installer.PLUGIN_NAME / 'skills' / 'math-modeling-championship-maxx'),
                     str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=240)
                 if result_run.returncode != 0:
-                    raise RuntimeError('Actual LibreOffice DOCX-to-PDF test failed; private logs were suppressed.')
+                    try:
+                        failure = json.loads(result_run.stdout).get('diagnostic', 'UNCLASSIFIED')
+                    except (ValueError, AttributeError):
+                        failure = 'UNCLASSIFIED'
+                    if not isinstance(failure, str) or not re.fullmatch(r'[A-Z_]{1,60}', failure):
+                        failure = 'REDACTED'
+                    raise RuntimeError('Actual LibreOffice DOCX-to-PDF test failed: ' + failure + '; private logs were suppressed.')
                 receipt = json.loads(result_run.stdout)
                 if receipt.get('status') != 'PASS':
                     raise RuntimeError('Actual document conversion did not return a PASS receipt.')

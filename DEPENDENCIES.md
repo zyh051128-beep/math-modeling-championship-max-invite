@@ -4,6 +4,8 @@
 
 完整邀请包包含 MAXx 总控、基础建模流程、随包技能、审计程序、模板和本说明。Python 库、Word/LibreOffice、LaTeX、MATLAB 等程序，以及 Wolfram、SciSpace 的账号连接需在接收者环境准备。下表把每个能力家族对应到实际运行条件；没有选用的专业应用不会阻断基础流程，但不能把其状态写成“已全部验证”。
 
+Windows 免费 Word→PDF 路线：先定位 LibreOffice 实际安装目录；自动转换和版本识别使用 `program/soffice.com` 控制台入口，并作为 `export_word_pdf.py --engine libreoffice --executable` 的绝对路径参数。`soffice.exe` 是 GUI 入口，不应依赖它回传控制台文字。Mac/Linux 使用本机 `soffice` 的绝对路径。详见 [LibreOffice 官方说明](https://help.libreoffice.org/latest/zh-CN/text/shared/guide/start_parameters.html)。Doctor 发现应用后仍须真实导出，不能省略公式与页面复核。
+
 ## 1. 发给受邀者的完整指令
 
 2.5 首次部署优先选择 `--delivery word` / `-Delivery word`，先打通完整Python计算、代码图表、可编辑Word与真实PDF主链；确需额外LaTeX源稿时再选 `both`，不因可选排版器尚未安装而反复重装插件。Mac自动导出采用LibreOffice，不能承诺Mac版Word的COM自动化。全部随包功能无需单独安装技能；外部应用/账号/许可证仍按下文逐项接通。
