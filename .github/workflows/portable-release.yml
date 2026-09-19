@@ -1,0 +1,38 @@
+name: Private payload portable release verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install official Codex CLI and test crypto dependency
+        run: |
+          npm install --global @openai/codex@0.155.1
+          python -m pip install cryptography
+      - name: Check installer regression against current private payload
+        env:
+          MAXX_TEST_INVITE_CODE: ${{ secrets.MAXX_RELEASE_TEST_CODE }}
+        run: python -I test_install_py.py
+      - name: Actual native extraction, plugin deployment and extended runtime
+        env:
+          MAXX_TEST_INVITE_CODE: ${{ secrets.MAXX_RELEASE_TEST_CODE }}
+        run: python -I verify_portable_release.py --install --setup-runtime
+      # Never upload artifacts, decrypted files, runtime logs or source trees.

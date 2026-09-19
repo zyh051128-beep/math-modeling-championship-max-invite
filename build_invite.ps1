@@ -76,12 +76,32 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 if (Test-Path -LiteralPath $zip) {
     [IO.File]::Delete([IO.Path]::GetFullPath($zip))
 }
-[IO.Compression.ZipFile]::CreateFromDirectory(
-    $source,
-    $zip,
-    [IO.Compression.CompressionLevel]::Optimal,
-    $false
-)
+# .NET Framework CreateFromDirectory on Windows can serialize backslashes.
+# ZIP member names are platform-independent POSIX paths, not filesystem paths.
+$archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    $prefixPath = [IO.Path]::GetFullPath($source).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    $seenNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in (Get-ChildItem -LiteralPath $source -Recurse -Force -File | Sort-Object FullName)) {
+        if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Links are not allowed in the release archive.' }
+        $fullPath = [IO.Path]::GetFullPath($file.FullName)
+        if (-not $fullPath.StartsWith($prefixPath, [StringComparison]::OrdinalIgnoreCase)) { throw 'Archive input escaped build root.' }
+        $entryName = $fullPath.Substring($prefixPath.Length).Replace('\', '/')
+        if ($entryName -match '(^/|\\|:|(^|/)\.\.?(/|$)|//)' -or -not $seenNames.Add($entryName)) {
+            throw 'Archive entry is not a unique portable relative path.'
+        }
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $fullPath, $entryName, [IO.Compression.CompressionLevel]::Optimal)
+    }
+    if ($seenNames.Count -eq 0) { throw 'Cannot publish an empty invitation archive.' }
+} finally { $archive.Dispose() }
+
+$archive = [IO.Compression.ZipFile]::OpenRead($zip)
+try {
+    foreach ($entry in $archive.Entries) {
+        if ($entry.FullName.Contains('\') -or $entry.FullName.StartsWith('/')) { throw 'Portable ZIP validation failed before encryption.' }
+    }
+    Write-Host ('Portable ZIP validated: ' + $archive.Entries.Count + ' entries; all separators are /.')
+} finally { $archive.Dispose() }
 
 $plain = [IO.File]::ReadAllBytes($zip)
 $sha = [Security.Cryptography.SHA256]::Create()
