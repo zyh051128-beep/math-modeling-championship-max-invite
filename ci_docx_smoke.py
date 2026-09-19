@@ -1,10 +1,23 @@
 """Public synthetic DOCX/PDF deployment test, not a mathematical-modeling paper."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
 from docx import Document
+
+def find_libreoffice():
+    candidates = [shutil.which('soffice'), shutil.which('libreoffice'),
+                  '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+                  str(Path.home() / 'Applications/LibreOffice.app/Contents/MacOS/soffice')]
+    for variable in ('ProgramFiles', 'ProgramFiles(x86)'):
+        if os.environ.get(variable):
+            candidates.append(str(Path(os.environ[variable]) / 'LibreOffice/program/soffice.exe'))
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return str(Path(candidate).resolve())
+    raise RuntimeError('LibreOffice executable was not found in PATH or standard application folders.')
 
 def run(skill_root, root):
     root.mkdir()
@@ -28,7 +41,8 @@ def run(skill_root, root):
     document.add_paragraph('External accounts, licensed applications, desktop login and complete contest papers are outside this smoke test.')
     source = root / 'source.docx'
     document.save(source)
-    result = exporter.export(root, 'source.docx', 'rendered.pdf', 'conversion.json', engine='libreoffice', timeout=180)
+    result = exporter.export(root, 'source.docx', 'rendered.pdf', 'conversion.json', engine='libreoffice',
+                             executable=find_libreoffice(), timeout=180)
     if result['status'] != 'PASS' or result['pdf']['page_count'] < 1:
         raise RuntimeError('Actual DOCX export failed.')
     print(json.dumps({'status':'PASS','engine':result['engine']['name'],'page_count':result['pdf']['page_count'],
