@@ -29,7 +29,7 @@ def verify(install=False, setup_runtime=False):
     digest = installer.verify_payload_checksum(payload, payload.with_name('SHA256.txt'))
     plain, backend = installer.decrypt_blob(payload.read_bytes(), code)
     with zipfile.ZipFile(io.BytesIO(plain)) as archive:
-        names = archive.namelist()
+        names = [info.orig_filename for info in archive.infolist()]
         if not names or any('\\' in name for name in names):
             raise RuntimeError('The release contains non-POSIX ZIP paths. Rebuild before publishing.')
         if archive.testzip() is not None:

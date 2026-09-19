@@ -1,5 +1,7 @@
 # 数模-MAXx｜邀请安装与更新入口
 
+路径兼容修复：2026-09-19 已重建加密包，ZIP 原始条目名统一为 `/`。安装器检查 `orig_filename`，避免 Windows 自动转换路径掩盖 macOS/Linux 错误。如果此前收到“unsafe member path”或要求发布者重新打包，请从全新临时目录重新克隆，不复用旧下载；以 `payload/SHA256.txt` 区分载荷。公开 [跨平台测试记录](https://github.com/zyh051128-beep/math-modeling-championship-max-invite/actions/workflows/portable-release.yml) 会测试同一份加密包；仅绿色完成的运行可作为对应版本证据，不能把排队中或失败的测试称为通过。测试不公开解密产物。
+
 本仓库只保存加密后的插件分发包，不包含可直接读取的插件源码。完整邀请链接末尾带有 `#invite=...`，邀请口令位于 URL 片段中，不会发送给 GitHub 服务器。为防聊天软件或任务转发丢失 URL 片段，发送者还会在同一条私信中单独列出同一邀请码；安装器支持 `-InviteCode` 备用输入，邀请码不进入本公开仓库。
 
 当前邀请包保留稳定插件标识 `math-modeling-championship-max`，首选总控技能为 `math-modeling-championship-maxx`，并保留旧名称兼容入口；同时内置完整的基础套件及经许可审计、固定版本的图表、附件、引文、MATLAB 代码和结果一致性技能。构建时逐文件核验受邀版与所有者版的功能一致性；安装器验证加密载荷完整性，并检查 MAXx、华为杯审计、兼容入口和基础运行时等关键文件，缺失即停止安装。

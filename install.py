@@ -273,7 +273,12 @@ def safe_extract_zip_bytes(archive_bytes: bytes, destination: Path) -> None:
         seen: set[str] = set()
         validated: list[tuple[zipfile.ZipInfo, tuple[str, ...], bool]] = []
         for info in infos:
-            parts = _safe_member_parts(info.filename)
+            # On Windows ZipInfo.filename silently normalizes backslashes and
+            # truncates NULs. Validate the original bytes-decoded name first so
+            # the same authenticated payload has the same result on every OS.
+            parts = _safe_member_parts(info.orig_filename)
+            if info.orig_filename != info.filename:
+                raise InstallError("The invitation archive contains a nonportable member name. Ask the publisher to rebuild it; do not bypass path checks.")
             key = "/".join(parts).casefold()
             if key in seen:
                 raise InstallError("The invitation archive contains duplicate or case-colliding paths.")

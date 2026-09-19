@@ -188,6 +188,18 @@ class ArchiveTests(unittest.TestCase):
             with self.assertRaisesRegex(installer.InstallError, "Links"):
                 installer.safe_extract_zip_bytes(zip_bytes([(link, b"target")]), Path(temporary) / "out")
 
+    def test_original_archive_names_are_rejected_before_windows_normalization(self) -> None:
+        # Patch both ZIP headers after writing: constructing ZipInfo with '\\'
+        # on Windows would normalize the fixture and miss the production bug.
+        original = zip_bytes([('folder/file.txt', b'content')])
+        for replacement in (b'folder\\file.txt', b'folder\x00file.txt'):
+            raw_archive = original.replace(b'folder/file.txt', replacement)
+            with self.subTest(name=repr(replacement)), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / 'out'
+                with self.assertRaises(installer.InstallError):
+                    installer.safe_extract_zip_bytes(raw_archive, output)
+                self.assertFalse(output.exists(), 'No extraction may start before complete path validation')
+
     def test_case_colliding_members_are_rejected(self) -> None:
         archive = zip_bytes([("Folder/File.txt", b"a"), ("folder/file.TXT", b"b")])
         with tempfile.TemporaryDirectory() as temporary:
