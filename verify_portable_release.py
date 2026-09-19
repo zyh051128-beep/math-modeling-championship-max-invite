@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -92,8 +93,14 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                 if result_run.returncode != 0:
                     raise RuntimeError('Actual LibreOffice DOCX-to-PDF test failed; private logs were suppressed.')
                 receipt = json.loads(result_run.stdout)
-                if receipt.get('status') != 'PASS' or not state.get('environment_ready'):
-                    raise RuntimeError('Word delivery environment was not ready after actual export.')
+                if receipt.get('status') != 'PASS':
+                    raise RuntimeError('Actual document conversion did not return a PASS receipt.')
+                if not state.get('environment_ready'):
+                    doctor = json.loads(Path(state['doctor_report']).read_text(encoding='utf-8'))
+                    # Only short identifiers, never paths, private text or logs.
+                    blockers = [item if isinstance(item, str) and re.fullmatch(r'[A-Za-z0-9_:.-]{1,160}', item)
+                                else 'REDACTED_DETAIL' for item in doctor.get('blocking_failures', [])]
+                    raise RuntimeError('Word delivery environment was not ready after actual export. Blockers: ' + json.dumps(blockers))
                 result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'])
             result['boundary'] = 'Real Codex registration and isolated Python setup. Desktop UI, account sign-in and licensed applications are not tested.'
         print(json.dumps(result, ensure_ascii=True, indent=2))
