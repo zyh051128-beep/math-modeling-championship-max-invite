@@ -643,7 +643,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "status": "VERIFIED", "plugin": PLUGIN_NAME, "version": package["version"],
                     "payload_sha256": payload_sha256, "crypto_backend": crypto_backend,
                     "scope": "checksum, invitation authentication, decryption, safe extraction and required files",
-                }, ensure_ascii=False, indent=2))
+                }, ensure_ascii=True, indent=2))
                 return 0
 
             codex = shutil.which("codex")
@@ -720,7 +720,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "all_optional_applications_executed": False,
             }
             write_json_new(install_root / "installation-state.json", state)
-            print(json.dumps(state, ensure_ascii=False, indent=2))
+            # Preserve Unicode paths losslessly even in a CP1252 console.
+            print(json.dumps(state, ensure_ascii=True, indent=2))
             print("Create a new Codex task after restarting Codex to load the updated plugin.")
             return 0 if ready else 2
     except InstallError as exc:
