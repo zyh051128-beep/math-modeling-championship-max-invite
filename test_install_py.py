@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -293,6 +294,34 @@ class StateTests(unittest.TestCase):
             raw = path.read_text(encoding="utf-8")
             self.assertNotIn(VALID_CODE, raw)
             self.assertNotIn("invite=", raw)
+
+
+class IsolatedUnicodeTests(unittest.TestCase):
+    def test_doctor_explicit_utf8_under_isolated_python(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'scripts').mkdir()
+            (root / 'scripts/max_doctor.py').write_text(
+                "import json,sys\n"
+                "assert sys.flags.isolated == 1 and sys.flags.utf8_mode == 1\n"
+                "print(json.dumps({'ready':True,'blocking_failures':[],'text':'数模-MAXx'},ensure_ascii=False))\n",
+                encoding='utf-8')
+            report, ready = installer.run_doctor(root, sys.executable, 'word', root / 'doctor.json')
+            self.assertTrue(ready)
+            self.assertEqual(report['text'], '数模-MAXx')
+
+    def test_runtime_explicit_utf8_under_isolated_python(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'scripts').mkdir()
+            (root / 'scripts/bootstrap_runtime.py').write_text(
+                "import json,sys\n"
+                "assert sys.flags.isolated == 1 and sys.flags.utf8_mode == 1\n"
+                "print(json.dumps({'status':'VERIFIED','execution_verified':True,'python':sys.executable,'text':'数模'},ensure_ascii=False))\n",
+                encoding='utf-8')
+            status, _ = installer.setup_runtime(root, sys.executable, 'extended', root / 'runtime.json')
+            self.assertEqual(status, 'VERIFIED')
+            self.assertEqual(json.loads((root / 'runtime.json').read_text(encoding='utf-8'))['text'], '数模')
 
 
 if __name__ == "__main__":

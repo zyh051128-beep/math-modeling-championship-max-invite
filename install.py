@@ -537,7 +537,7 @@ def resolve_python(candidate: str | None) -> str:
 
 def setup_runtime(maxx_root: Path, python: str, profile: str, report_path: Path) -> tuple[str, str]:
     script = maxx_root / "scripts" / "bootstrap_runtime.py"
-    completed = _run_text([python, "-I", str(script), "--profile", profile], timeout=3600)
+    completed = _run_text([python, "-X", "utf8", "-I", str(script), "--profile", profile], timeout=3600)
     try:
         report = json.loads(completed.stdout)
     except json.JSONDecodeError as exc:
@@ -563,7 +563,7 @@ def run_doctor(maxx_root: Path, python: str, delivery: str, output_path: Path) -
     env = dict(os.environ)
     env.update({"MATHMODEL_PYTHON": python, "PYTHONUTF8": "1"})
     completed = _run_text(
-        [python, "-I", str(script), "--delivery", delivery, "--profile", "championship", "--inputs", "csv", "xlsx", "--output", str(output_path)],
+        [python, "-X", "utf8", "-I", str(script), "--delivery", delivery, "--profile", "championship", "--inputs", "csv", "xlsx", "--output", str(output_path)],
         timeout=900,
         env=env,
     )
