@@ -57,7 +57,9 @@ def verify(install=False, setup_runtime=False):
                   'crypto_backend': backend, 'plugin_registration': 'NOT_RUN',
                   'runtime': 'NOT_RUN', 'optional_accounts_and_licensed_apps': 'NOT_TESTED'}
         if install:
-            parent = Path(temp) / 'installed'
+            # macOS /var is a system symlink. Resolve our own newly-created
+            # scratch directory, never relax the installer's no-link policy.
+            parent = Path(temp).resolve() / 'installed'
             args = ['--invite-code', code, '--install-parent', str(parent), '--delivery', 'word']
             if setup_runtime:
                 args.extend(['--setup-runtime', '--runtime-profile', 'extended'])
@@ -67,6 +69,8 @@ def verify(install=False, setup_runtime=False):
             # Never print captured logs: they refer to decrypted private files.
             states = list(parent.glob('*/installation-state.json')) if parent.exists() else []
             if exit_code not in (0, 2) or len(states) != 1:
+                if 'installation path must not contain symlinks' in captured.getvalue():
+                    raise RuntimeError('Release test installation parent contains a symlink; use the canonical scratch directory.')
                 raise RuntimeError('Actual Codex plugin installation failed; private logs were suppressed.')
             state = json.loads(states[0].read_text(encoding='utf-8'))
             if state.get('plugin_installed') is not True:

@@ -166,6 +166,61 @@ function Write-TestPayload([string]$ZipPath, [string]$PayloadPath) {
     try { [byte[]]$payload = $prefix + $hmac.ComputeHash($prefix) }
     finally { $hmac.Dispose() }
     [IO.File]::WriteAllBytes($PayloadPath, $payload)
+    $hash = (Get-FileHash -LiteralPath $PayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText((Join-Path ([IO.Path]::GetDirectoryName($PayloadPath)) 'SHA256.txt'), $hash + '  plugin-marketplace.aes' + "`n", [Text.UTF8Encoding]::new($false))
+}
+
+function Write-PortableFixtureZip([string]$SourceRoot, [string]$ZipPath) {
+    $archive = [IO.Compression.ZipFile]::Open($ZipPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        $prefix = [IO.Path]::GetFullPath($SourceRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        foreach ($file in (Get-ChildItem -LiteralPath $SourceRoot -Recurse -Force -File)) {
+            $name = $file.FullName.Substring($prefix.Length).Replace('\', '/')
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $name)
+        }
+    } finally { $archive.Dispose() }
+}
+
+function Write-UnsafeFixtureZip([string]$ZipPath, [string]$Kind) {
+    $names = switch ($Kind) {
+        'backslash' { @('folder\file.txt') }
+        'nul' { @('nullXname.txt') }
+        'traversal' { @('../escape.txt') }
+        'absolute' { @('/absolute.txt') }
+        'drive' { @('C:/escape.txt') }
+        'collision' { @('same.txt', 'SAME.txt') }
+        'parent-conflict' { @('parent', 'parent/child.txt') }
+        'total-size' { @('size1', 'size2', 'size3', 'size4', 'size5') }
+        default { @('safe.txt') }
+    }
+    $archive = [IO.Compression.ZipFile]::Open($ZipPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($name in $names) {
+            $entry = $archive.CreateEntry($name)
+            $stream = $entry.Open()
+            try { $stream.WriteByte(120) } finally { $stream.Dispose() }
+        }
+    } finally { $archive.Dispose() }
+    $bytes = [IO.File]::ReadAllBytes($ZipPath)
+    $end = $bytes.Length - 22
+    $position = [int][BitConverter]::ToUInt32($bytes, $end + 16)
+    for ($index = 0; $index -lt $names.Count; $index++) {
+        $nameLength = [BitConverter]::ToUInt16($bytes, $position + 28)
+        $extra = [BitConverter]::ToUInt16($bytes, $position + 30)
+        $comment = [BitConverter]::ToUInt16($bytes, $position + 32)
+        $local = [int][BitConverter]::ToUInt32($bytes, $position + 42)
+        if ($Kind -eq 'nul') { $bytes[$position + 50] = 0; $bytes[$local + 34] = 0 }
+        if ($Kind -eq 'symlink') { [Array]::Copy([BitConverter]::GetBytes([uint32]2717843456), 0, $bytes, $position + 38, 4) }
+        if ($Kind -eq 'member-size') { [Array]::Copy([BitConverter]::GetBytes([uint32]536870913), 0, $bytes, $position + 24, 4) }
+        if ($Kind -eq 'total-size') { [Array]::Copy([BitConverter]::GetBytes([uint32]536870912), 0, $bytes, $position + 24, 4) }
+        if ($Kind -eq 'local-name-mismatch') { $bytes[$local + 30] = 88 }
+        $position += 46 + $nameLength + $extra + $comment
+    }
+    if ($Kind -eq 'entry-count') {
+        [Array]::Copy([BitConverter]::GetBytes([uint16]20001), 0, $bytes, $end + 8, 2)
+        [Array]::Copy([BitConverter]::GetBytes([uint16]20001), 0, $bytes, $end + 10, 2)
+    }
+    [IO.File]::WriteAllBytes($ZipPath, $bytes)
 }
 
 function Invoke-Case([string]$Name, [string]$Directory) {
@@ -247,10 +302,49 @@ exit 0
 '@
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression
     $zip = Join-Path $FixtureRoot 'fixture.zip'
-    [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $FixtureRoot 'marketplace'), $zip)
+    Write-PortableFixtureZip (Join-Path $FixtureRoot 'marketplace') $zip
     New-Item -ItemType Directory -Path (Join-Path $FixtureRoot 'payload') | Out-Null
     Write-TestPayload $zip (Join-Path $FixtureRoot 'payload\plugin-marketplace.aes')
+
+    $portableFixture = $FixtureRoot
+    foreach ($unsafeKind in @('backslash', 'nul', 'traversal', 'absolute', 'drive', 'collision', 'parent-conflict', 'symlink', 'member-size', 'total-size', 'entry-count', 'local-name-mismatch')) {
+        $negativeRoot = Join-Path $testRoot ('zip-' + $unsafeKind)
+        New-Item -ItemType Directory -Path (Join-Path $negativeRoot 'payload') -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $portableFixture 'install.ps1') -Destination (Join-Path $negativeRoot 'install.ps1')
+        $negativeZip = Join-Path $negativeRoot 'unsafe.zip'
+        Write-UnsafeFixtureZip $negativeZip $unsafeKind
+        Write-TestPayload $negativeZip (Join-Path $negativeRoot 'payload\plugin-marketplace.aes')
+        $FixtureRoot = $negativeRoot
+        $case = Join-Path $testRoot ('reject-' + $unsafeKind)
+        try { $run = Invoke-Case 'healthy' $case } finally { $FixtureRoot = $portableFixture }
+        Assert-Test ($run.ExitCode -ne 0 -and $run.ExitCode -ne 2 -and $run.Output -match 'ZIP') ('Unsafe ZIP was not rejected: ' + $unsafeKind + ': ' + $run.Output)
+        Assert-Test (@(Get-InstallRoots $case).Count -eq 0) ('Unsafe ZIP left installed files: ' + $unsafeKind)
+        Assert-Test (-not (Test-Path -LiteralPath (Join-Path $case 'codex-calls.txt'))) ('Unsafe ZIP reached registration: ' + $unsafeKind)
+        Assert-Test (-not (Test-Path -LiteralPath (Join-Path $case 't\escape.txt'))) 'Traversal wrote outside its extraction directory.'
+        $results.Add([pscustomobject]@{ test = ('raw ZIP ' + $unsafeKind + ' rejected before extraction and registration'); status = 'PASS' })
+    }
+    foreach ($checksumKind in @('missing', 'wrong-hash', 'wrong-filename', 'extra-entry')) {
+        $negativeRoot = Join-Path $testRoot ('sha-' + $checksumKind)
+        New-Item -ItemType Directory -Path (Join-Path $negativeRoot 'payload') -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $portableFixture 'install.ps1') -Destination (Join-Path $negativeRoot 'install.ps1')
+        Copy-Item -LiteralPath (Join-Path $portableFixture 'payload\plugin-marketplace.aes') -Destination (Join-Path $negativeRoot 'payload\plugin-marketplace.aes')
+        $checksumPath = Join-Path $negativeRoot 'payload\SHA256.txt'
+        $goodChecksum = [IO.File]::ReadAllText((Join-Path $portableFixture 'payload\SHA256.txt'))
+        switch ($checksumKind) {
+            'wrong-hash' { [IO.File]::WriteAllText($checksumPath, ('0' * 64) + '  plugin-marketplace.aes') }
+            'wrong-filename' { [IO.File]::WriteAllText($checksumPath, $goodChecksum.Replace('plugin-marketplace.aes', 'other.aes')) }
+            'extra-entry' { [IO.File]::WriteAllText($checksumPath, $goodChecksum + $goodChecksum) }
+        }
+        $FixtureRoot = $negativeRoot
+        $case = Join-Path $testRoot ('reject-sha-' + $checksumKind)
+        try { $run = Invoke-Case 'healthy' $case } finally { $FixtureRoot = $portableFixture }
+        Assert-Test ($run.ExitCode -ne 0 -and $run.ExitCode -ne 2 -and $run.Output -match 'SHA256') ('Bad checksum was not rejected: ' + $checksumKind + ': ' + $run.Output)
+        Assert-Test (@(Get-InstallRoots $case).Count -eq 0) 'Bad checksum installed files.'
+        Assert-Test (-not (Test-Path -LiteralPath (Join-Path $case 'codex-calls.txt'))) 'Bad checksum reached registration.'
+        $results.Add([pscustomobject]@{ test = ('payload checksum ' + $checksumKind + ' rejected'); status = 'PASS' })
+    }
 
     $case = Join-Path $testRoot 'v'
     $run = Invoke-Case 'verify-only' $case

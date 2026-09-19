@@ -86,6 +86,146 @@ function Write-InstallJson([string]$Path, [object]$Value) {
     [IO.File]::WriteAllText($Path, (($Value | ConvertTo-Json -Depth 12) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 }
 
+function Assert-PayloadChecksum([string]$Path) {
+    $checksumPath = Join-Path ([IO.Path]::GetDirectoryName($Path)) 'SHA256.txt'
+    foreach ($inputPath in @($Path, $checksumPath)) {
+        if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf) -or
+            ((Get-Item -LiteralPath $inputPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'The invitation payload or SHA256 checksum file is missing or unsafe.'
+        }
+    }
+    if ((Get-Item -LiteralPath $Path).Length -gt 536870912) { throw 'The encrypted invitation payload exceeds the allowed size.' }
+    $lines = @([IO.File]::ReadAllLines($checksumPath) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($lines.Count -ne 1 -or $lines[0].Trim() -notmatch '^([0-9a-fA-F]{64})\s+\*?plugin-marketplace\.aes$') {
+        throw 'The invitation SHA256 checksum must have exactly one correctly named entry.'
+    }
+    $expected = $Matches[1]
+    if ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ine $expected) {
+        throw 'The encrypted invitation payload does not match its published SHA256 checksum.'
+    }
+}
+
+function Assert-PortableMember([string]$Name) {
+    if ([string]::IsNullOrEmpty($Name) -or $Name.Contains([string][char]0) -or $Name.Contains('\') -or
+        $Name.StartsWith('/') -or $Name.Contains(':')) { throw 'Unsafe ZIP member path.' }
+    $logical = $Name.TrimEnd('/')
+    if ([string]::IsNullOrEmpty($logical) -or $Name.EndsWith('//')) { throw 'Unsafe ZIP member path.' }
+    foreach ($part in ($logical -split '/')) {
+        if ($part -eq '' -or $part -eq '.' -or $part -eq '..' -or $part -match '[. ]$' -or
+            $part -match '[\x00-\x1f<>"|?*]' -or $part -match '^(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)') {
+            throw 'Unsafe ZIP member path.'
+        }
+    }
+}
+
+function Get-RawZipInventory([byte[]]$Bytes) {
+    # Inspect the original central-directory and local names before any ZIP
+    # library can normalize platform separators or truncate NUL-containing names.
+    $end = -1
+    for ($offset = $Bytes.Length - 22; $offset -ge [Math]::Max(0, $Bytes.Length - 65557); $offset--) {
+        if ([BitConverter]::ToUInt32($Bytes, $offset) -eq 0x06054b50 -and
+            $offset + 22 + [BitConverter]::ToUInt16($Bytes, $offset + 20) -eq $Bytes.Length) { $end = $offset; break }
+    }
+    if ($end -lt 0) { throw 'Invalid ZIP end directory.' }
+    $count = [int][BitConverter]::ToUInt16($Bytes, $end + 10)
+    [long]$directorySize = [BitConverter]::ToUInt32($Bytes, $end + 12)
+    [long]$position = [BitConverter]::ToUInt32($Bytes, $end + 16)
+    if ([BitConverter]::ToUInt16($Bytes, $end + 4) -ne 0 -or [BitConverter]::ToUInt16($Bytes, $end + 6) -ne 0 -or
+        [BitConverter]::ToUInt16($Bytes, $end + 8) -ne $count -or $count -le 0 -or $count -gt 20000 -or
+        $position + $directorySize -ne $end) { throw 'Invalid ZIP directory count, size or unsupported multi-disk/ZIP64 archive.' }
+    $members = [Collections.Generic.List[object]]::new()
+    $paths = [Collections.Generic.Dictionary[string,bool]]::new([StringComparer]::OrdinalIgnoreCase)
+    [long]$total = 0
+    for ($index = 0; $index -lt $count; $index++) {
+        if ($position + 46 -gt $end -or [BitConverter]::ToUInt32($Bytes, [int]$position) -ne 0x02014b50) { throw 'Invalid ZIP central directory entry.' }
+        $flags = [BitConverter]::ToUInt16($Bytes, [int]$position + 8)
+        $method = [BitConverter]::ToUInt16($Bytes, [int]$position + 10)
+        [long]$compressed = [BitConverter]::ToUInt32($Bytes, [int]$position + 20)
+        [long]$length = [BitConverter]::ToUInt32($Bytes, [int]$position + 24)
+        $nameSize = [BitConverter]::ToUInt16($Bytes, [int]$position + 28)
+        $extraSize = [BitConverter]::ToUInt16($Bytes, [int]$position + 30)
+        $commentSize = [BitConverter]::ToUInt16($Bytes, [int]$position + 32)
+        [long]$attributes = [BitConverter]::ToUInt32($Bytes, [int]$position + 38)
+        [long]$local = [BitConverter]::ToUInt32($Bytes, [int]$position + 42)
+        if ($position + 46 + $nameSize + $extraSize + $commentSize -gt $end -or $nameSize -eq 0 -or
+            ($flags -band 1) -ne 0 -or $method -notin @(0, 8) -or
+            [BitConverter]::ToUInt16($Bytes, [int]$position + 34) -ne 0) { throw 'Invalid or unsupported ZIP member metadata.' }
+        $encoding = if ($flags -band 2048) { [Text.UTF8Encoding]::new($false, $true) } else { [Text.Encoding]::GetEncoding(437) }
+        $name = $encoding.GetString($Bytes, [int]$position + 46, $nameSize)
+        Assert-PortableMember $name
+        $isDirectory = $name.EndsWith('/')
+        $type = ($attributes -shr 16) -band 61440
+        if ($type -notin @(0, 32768, 16384) -or ($attributes -band 1024) -ne 0 -or
+            ($type -eq 16384 -and -not $isDirectory) -or ($type -eq 32768 -and $isDirectory)) {
+            throw 'Links, special files or inconsistent ZIP member types are forbidden.'
+        }
+        if ($length -gt 536870912 -or $compressed -gt 536870912 -or ($isDirectory -and $length -ne 0)) { throw 'ZIP member exceeds the allowed size.' }
+        $total += $length
+        if ($total -gt 2147483648) { throw 'ZIP archive exceeds the allowed expanded size.' }
+        $key = $name.TrimEnd('/')
+        if ($paths.ContainsKey($key)) { throw 'Duplicate or case-colliding ZIP paths are forbidden.' }
+        $paths.Add($key, $isDirectory)
+        if ($local + 30 -gt $Bytes.Length -or [BitConverter]::ToUInt32($Bytes, [int]$local) -ne 0x04034b50) { throw 'Invalid ZIP local file header.' }
+        $localNameSize = [BitConverter]::ToUInt16($Bytes, [int]$local + 26)
+        $localExtraSize = [BitConverter]::ToUInt16($Bytes, [int]$local + 28)
+        if ($localNameSize -ne $nameSize -or $local + 30 + $localNameSize + $localExtraSize + $compressed -gt [BitConverter]::ToUInt32($Bytes, $end + 16) -or
+            [BitConverter]::ToUInt16($Bytes, [int]$local + 6) -ne $flags -or [BitConverter]::ToUInt16($Bytes, [int]$local + 8) -ne $method) {
+            throw 'ZIP local and central metadata disagree.'
+        }
+        for ($character = 0; $character -lt $nameSize; $character++) {
+            if ($Bytes[[int]$local + 30 + $character] -ne $Bytes[[int]$position + 46 + $character]) { throw 'ZIP local and central member names disagree.' }
+        }
+        $members.Add([pscustomobject]@{ Name=$name; IsDirectory=$isDirectory; Length=$length; CompressedLength=$compressed })
+        $position += 46 + $nameSize + $extraSize + $commentSize
+    }
+    if ($position -ne $end) { throw 'ZIP directory length does not match its entries.' }
+    foreach ($key in $paths.Keys) {
+        $parts = $key -split '/'
+        for ($level = 1; $level -lt $parts.Count; $level++) {
+            $ancestor = ($parts[0..($level - 1)] -join '/')
+            if ($paths.ContainsKey($ancestor) -and -not $paths[$ancestor]) { throw 'ZIP file and directory paths conflict.' }
+        }
+    }
+    return $members.ToArray()
+}
+
+function Expand-PortableArchive([string]$Path, [string]$Destination, [object[]]$Inventory) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        if ($archive.Entries.Count -ne $Inventory.Count) { throw 'ZIP parser entry counts disagree.' }
+        for ($index = 0; $index -lt $Inventory.Count; $index++) {
+            $entry, $item = $archive.Entries[$index], $Inventory[$index]
+            if ($entry.FullName -cne $item.Name -or $entry.Length -ne $item.Length -or $entry.CompressedLength -ne $item.CompressedLength) { throw 'ZIP parser metadata disagree.' }
+        }
+        if (Test-Path -LiteralPath $Destination) { throw 'ZIP extraction requires a new directory.' }
+        New-Item -ItemType Directory -Path $Destination | Out-Null
+        $prefix = [IO.Path]::GetFullPath($Destination).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        for ($index = 0; $index -lt $Inventory.Count; $index++) {
+            $entry, $item = $archive.Entries[$index], $Inventory[$index]
+            $target = [IO.Path]::GetFullPath((Join-Path $Destination $item.Name.Replace('/', [string][IO.Path]::DirectorySeparatorChar)))
+            if (-not $target.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'ZIP extraction escaped its destination.' }
+            if ($item.IsDirectory) { New-Item -ItemType Directory -Path $target -Force | Out-Null; continue }
+            New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force | Out-Null
+            $source = $entry.Open()
+            try {
+                $output = [IO.File]::Open($target, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                try {
+                    $buffer = New-Object byte[] 65536
+                    [long]$written = 0
+                    while (($read = $source.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                        $written += $read
+                        if ($written -gt $item.Length -or $written -gt 536870912) { throw 'ZIP expanded member exceeds its declared size.' }
+                        $output.Write($buffer, 0, $read)
+                    }
+                    if ($written -ne $item.Length) { throw 'ZIP expanded member has an unexpected length.' }
+                } finally { $output.Dispose() }
+            } finally { $source.Dispose() }
+        }
+    } finally { $archive.Dispose() }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $workRoot | Out-Null
     if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
@@ -98,6 +238,7 @@ try {
         }
     }
 
+    Assert-PayloadChecksum $payloadPath
     $blob = [IO.File]::ReadAllBytes($payloadPath)
     $magic = [Text.Encoding]::ASCII.GetBytes('MMCMAX1')
     if ($blob.Length -lt 56) { throw 'The invitation package is incomplete or corrupted.' }
@@ -108,6 +249,7 @@ try {
     $iv = New-Object byte[] 16
     [Array]::Copy($blob, 7, $iv, 0, 16)
     $cipherLength = $blob.Length - 7 - 16 - 32
+    if ($cipherLength -le 0 -or $cipherLength % 16 -ne 0) { throw 'The invitation ciphertext has an invalid length.' }
     $cipher = New-Object byte[] $cipherLength
     [Array]::Copy($blob, 23, $cipher, 0, $cipherLength)
     $expectedMac = New-Object byte[] 32
@@ -153,7 +295,8 @@ try {
     }
 
     [IO.File]::WriteAllBytes($zipPath, $plain)
-    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath
+    $inventory = @(Get-RawZipInventory $plain)
+    Expand-PortableArchive $zipPath $extractPath $inventory
     $pluginRoot = Join-Path $extractPath 'plugins\math-modeling-championship-max'
     $manifestPath = Join-Path $pluginRoot '.codex-plugin\plugin.json'
     $requiredEntrypoints = @(
