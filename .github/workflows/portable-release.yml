@@ -31,8 +31,19 @@ jobs:
         env:
           MAXX_TEST_INVITE_CODE: ${{ secrets.MAXX_RELEASE_TEST_CODE }}
         run: python -I test_install_py.py
+      - name: Prepare free document backend on Windows
+        if: runner.os == 'Windows'
+        run: choco install libreoffice-fresh --yes --no-progress
+      - name: Prepare free document backend on macOS
+        if: runner.os == 'macOS'
+        run: brew install --cask libreoffice
+      - name: Prepare free document backend on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libreoffice-writer
       - name: Actual native extraction, plugin deployment and extended runtime
         env:
           MAXX_TEST_INVITE_CODE: ${{ secrets.MAXX_RELEASE_TEST_CODE }}
-        run: python -I verify_portable_release.py --install --setup-runtime
+        run: python -I verify_portable_release.py --install --setup-runtime --office-smoke
       # Never upload artifacts, decrypted files, runtime logs or source trees.

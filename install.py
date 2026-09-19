@@ -26,6 +26,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from typing import Callable, Sequence
 from urllib.parse import parse_qsl, urlsplit
 import uuid
@@ -254,10 +255,14 @@ def decrypt_blob(blob: bytes, invite_code: str, backend: str = "auto") -> tuple[
 def _safe_member_parts(name: str) -> tuple[str, ...]:
     if not name or "\x00" in name or "\\" in name or name.startswith("/") or re.match(r"^[A-Za-z]:", name):
         raise InstallError("The invitation archive contains an unsafe member path.")
-    pure = PurePosixPath(name.rstrip("/"))
-    if not pure.parts or any(part in {"", ".", ".."} for part in pure.parts):
+    parts = tuple((name[:-1] if name.endswith('/') else name).split('/'))
+    if not parts or any(part in {"", ".", ".."} for part in parts):
         raise InstallError("The invitation archive contains a path traversal entry.")
-    return pure.parts
+    for part in parts:
+        if (any(ord(c) < 32 or c in '<>:"|?*' for c in part) or part.endswith((' ', '.'))
+                or re.match(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', part, re.I)):
+            raise InstallError("The invitation archive contains a nonportable member path.")
+    return parts
 
 
 def safe_extract_zip_bytes(archive_bytes: bytes, destination: Path) -> None:
@@ -279,7 +284,7 @@ def safe_extract_zip_bytes(archive_bytes: bytes, destination: Path) -> None:
             parts = _safe_member_parts(info.orig_filename)
             if info.orig_filename != info.filename:
                 raise InstallError("The invitation archive contains a nonportable member name. Ask the publisher to rebuild it; do not bypass path checks.")
-            key = "/".join(parts).casefold()
+            key = unicodedata.normalize('NFD', "/".join(parts)).casefold()
             if key in seen:
                 raise InstallError("The invitation archive contains duplicate or case-colliding paths.")
             seen.add(key)
@@ -302,6 +307,13 @@ def safe_extract_zip_bytes(archive_bytes: bytes, destination: Path) -> None:
             if total > MAX_TOTAL_SIZE:
                 raise InstallError("The invitation archive exceeds the allowed expanded size.")
             validated.append((info, parts, is_dir))
+
+        files = {unicodedata.normalize('NFD', '/'.join(parts)).casefold()
+                 for _, parts, is_dir in validated if not is_dir}
+        for _, parts, _ in validated:
+            if any(unicodedata.normalize('NFD', '/'.join(parts[:i])).casefold() in files
+                   for i in range(1, len(parts))):
+                raise InstallError('The invitation archive contains a file/directory path conflict.')
 
         try:
             destination.mkdir(parents=True, exist_ok=False)
@@ -365,6 +377,12 @@ def verify_extracted_marketplace(root: Path) -> dict[str, str]:
     version = manifest.get("version")
     if not isinstance(version, str) or not version.strip():
         raise InstallError("The decrypted plugin manifest has no valid version.")
+    release = re.match(r'^(\d+)\.(\d+)\.', version)
+    if release and tuple(map(int, release.groups())) >= (2, 5):
+        for name in ('word_equations.py', 'equation_layout_audit.py', 'abstract_quality_audit.py', 'render_evidence_figures.py'):
+            _assert_regular_file(plugin_root, 'skills/math-modeling-championship-maxx/scripts/' + name)
+        for name in ('deep-rehearsal-report.md', 'equation-fidelity-contract.md', 'abstract-quality-contract.md', 'evidence-figure-gallery.md'):
+            _assert_regular_file(plugin_root, 'skills/math-modeling-championship-maxx/references/' + name)
     return {"version": version, "plugin_root": str(plugin_root), "manifest": str(manifest_path)}
 
 

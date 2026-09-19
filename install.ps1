@@ -334,6 +334,13 @@ try {
         }
     }
     $version = (Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestPath | ConvertFrom-Json).version
+    if ($version -match '^(\d+)\.(\d+)\.' -and ([int]$Matches[1] -gt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -ge 5))) {
+        foreach ($newFile in @('scripts/word_equations.py', 'scripts/equation_layout_audit.py', 'scripts/abstract_quality_audit.py', 'scripts/render_evidence_figures.py', 'references/deep-rehearsal-report.md', 'references/equation-fidelity-contract.md', 'references/abstract-quality-contract.md', 'references/evidence-figure-gallery.md')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $pluginRoot ('skills/math-modeling-championship-maxx/' + $newFile)) -PathType Leaf)) {
+                throw ('The decrypted package is incomplete. Missing: ' + $newFile)
+            }
+        }
+    }
     if ($VerifyOnly) {
         Write-Host ('Invitation package verified (decryption and required files only): Shumo-MAXx ' + $version)
         return

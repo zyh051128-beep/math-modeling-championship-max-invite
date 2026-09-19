@@ -6,6 +6,10 @@
 
 ## 1. 发给受邀者的完整指令
 
+2.5 首次部署优先选择 `--delivery word` / `-Delivery word`，先打通完整Python计算、代码图表、可编辑Word与真实PDF主链；确需额外LaTeX源稿时再选 `both`，不因可选排版器尚未安装而反复重装插件。Mac自动导出采用LibreOffice，不能承诺Mac版Word的COM自动化。全部随包功能无需单独安装技能；外部应用/账号/许可证仍按下文逐项接通。
+
+跨平台ZIP修复：安装器必须检查ZIP原始条目名，而非Windows已自动转换后的路径。出现unsafe member path先记录载荷摘要并用全新临时目录重新下载当前发布；不得关闭路径检查。发布者通过Windows、Linux、Apple Silicon和Intel Mac的同载荷测试后才能按实测范围宣告跨平台通过。
+
 把收到的**完整邀请链接（保留末尾 `#invite=...`）**和发送者另列的**邀请码**一起以纯文本发给 Codex。邀请码是链接中 `#invite=` 后的同一串字符；两种输入互为备用，不要把口令提交到公开仓库、工单或日志：
 
 > 请用这条完整邀请链接安装或更新“数模-MAXx”；若任务记录中没有完整 URL 或 `#invite=` 被截断，就使用我同时提供的单独邀请码。从邀请仓库全新克隆，按仓库安装说明启用 SetupRuntime、extended 环境和 both 交付配置。使用我本机的真实 Python，准备独立环境，保留安装与依赖检查回执。读取插件内 external-installation.md，检查下表的全部能力家族：配置基础数值、建模、代码绘图、文档/PDF 和审计功能；按题型准备可选应用，并在宿主实际支持的插件搜索/连接流程中检查 Wolfram 和 SciSpace。对需要我完成的登录、授权或许可证操作给出准确入口；连接完成后用公开合成示例验证。运行 Doctor、集成冒烟检查，并分别报告已通过、采用替代路线、待连接、未实测和失败项，不把“找到安装路径”当作“可执行”。保留外部功能安装说明和后续修复命令；完成后提示我重启 Codex 并新建任务加载新版。
@@ -135,6 +139,8 @@ Wolfram与SciSpace没有在本插件中嵌入共享账号、API密钥或第三�
 其他未在当前能力登记表中的领域技能，应先看题目是否需要、许可证和依赖是否明确，再加入项目。高星仓库并不等于已审查，也不等于所有依赖可在当前系统安装。
 
 ## 6. 受邀者必须完成的验收
+
+2.5 必须能找到 `word_equations.py`、`equation_layout_audit.py`、`abstract_quality_audit.py`、`render_evidence_figures.py` 和 `deep-rehearsal-report.md`。这些只使用已有核心依赖，不额外依赖绘图网站账号。默认演练目标约60页，按实质论证填充；数学结构、导出字形位置、摘要两轮版本链及数据图来源分别核验，不能仅因安装成功就称“所有论文均无错误”。
 
 2.4 新增中文总包、Word 原生源稿和真实导出门禁。必须找到 `export_word_pdf.py`、`word_source_audit.py`、`build_delivery_zip.py` 与 `word-delivery-contract.md`。先创建含真实正文、表格和公式的可编辑 DOCX，再用真实 Word 或明确选择的 LibreOffice 导出 PDF；缺排版器就报告该路线未就绪，`python-docx` 不能替代排版程序。导出器会拒绝宏、OLE、DDE 和外部关系（含可点击外链；可先改为纯文本网址），并保留原件、日志及哈希。Windows 本机曾验证真实 Word 路线；LibreOffice 必须在接收者设备另外实测，不得沿用发送者的成功记录。Word 许可证不随邀请共享。
 

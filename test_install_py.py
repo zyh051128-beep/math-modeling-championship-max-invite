@@ -158,6 +158,13 @@ class PayloadTests(unittest.TestCase):
 
 
 class ArchiveTests(unittest.TestCase):
+    def test_deep_release_missing_new_components_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / 'fixture'
+            build_marketplace_fixture(fixture, version='2.5.0+codex.test')
+            with self.assertRaisesRegex(installer.InstallError, 'word_equations.py'):
+                installer.verify_extracted_marketplace(fixture)
+
     def test_safe_archive_extracts_and_marketplace_validates(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "fixture"
@@ -205,6 +212,23 @@ class ArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaisesRegex(installer.InstallError, "case-colliding"):
                 installer.safe_extract_zip_bytes(archive, Path(temporary) / "out")
+
+    def test_nonportable_components_rejected_before_extract(self):
+        for name in ('folder/./file', 'folder//file', 'folder/name:stream', 'folder/CON.txt', 'folder/trailing.', 'folder/trailing '):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / 'out'
+                with self.assertRaises(installer.InstallError):
+                    installer.safe_extract_zip_bytes(zip_bytes([(name, b'x')]), output)
+                self.assertFalse(output.exists())
+
+    def test_unicode_normalization_collisions_and_parent_file_rejected(self):
+        for entries in ([('caf\u00e9.txt', b'a'), ('cafe\u0301.txt', b'b')],
+                        [('folder', b'a'), ('folder/file', b'b')]):
+            with self.subTest(entries=entries), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / 'out'
+                with self.assertRaises(installer.InstallError):
+                    installer.safe_extract_zip_bytes(zip_bytes(entries), output)
+                self.assertFalse(output.exists())
 
     def test_wrong_marketplace_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

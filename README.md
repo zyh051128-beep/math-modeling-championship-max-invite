@@ -8,6 +8,8 @@
 
 ## 最简单的使用方式
 
+2.5深度更新：完整演练论文默认约60页（55–65页），加强论证、摘要两轮改写、代码证据组合图和Word→PDF公式检查。保留中文完整材料包、可编辑Word和全部源程序。不公开插件源码，不共享邀请人的账号与许可证。
+
 2.4 强化中文命名完整材料包、原生可编辑 Word 与同源 PDF、实际范文页数预算、代码图表可编辑重绘，以及算法结果/基线/约束/重复运行验证。页数不是质量认证；未核实的范文获奖身份不会自动写成国奖。安装后需按说明实际验证 Word 导出，不能只发现应用就宣称全部就绪。
 
 当前2.3版新增必需的全篇技术路线图、每问求解步骤图、摘要证据映射和PDF逐页呈现检查。图由随包代码生成，并提供可编辑结构、源码、SVG/PDF/高清PNG及运行回执；新门禁与既有数据、代码、图表和AI标注门禁共同执行。该功能使用已配置的核心Python依赖，不额外要求Graphviz或在线绘图账号。
@@ -30,8 +32,8 @@ Codex 应执行以下流程（不要使用 `raw.githubusercontent.com`，不要�
 
 1. 从当前消息中的完整 URL 读取 `#invite=` 后的邀请码；若任务记录未包含 URL 或片段被截断，使用用户在同条消息中单独提供的邀请码。
 2. 使用 `git clone --depth 1` 克隆本公开分发仓库。
-3. 从克隆目录执行 `install.ps1 -InviteUrl <完整邀请链接> -SetupRuntime -RuntimeProfile extended -Delivery both`。片段缺失时执行 `install.ps1 -InviteCode <单独邀请码> -SetupRuntime -RuntimeProfile extended -Delivery both`。安装器会识别和替换同一邀请市场的旧版本。
-4. 安装器会建立隔离 Python 环境并运行 Doctor，保存安装与环境报告。退出码 `2` 表示插件已安装而环境待补齐，按 DEPENDENCIES.md 处理，不要反复重装或虚报全部就绪；不要再创建独立验证任务。
+3. 识别操作系统：Windows运行 `install.ps1 -InviteCode <邀请码> -SetupRuntime -RuntimeProfile extended -Delivery word`；macOS/Linux运行 `sh ./install.sh --invite-code '<邀请码>' --setup-runtime --runtime-profile extended --delivery word`。也可改用完整链接参数；只执行所选系统的一种路线，勿顺序执行所有备用命令。需要附加LaTeX时改为 `both`。安装器会识别和替换同一邀请市场的旧版本。
+4. 安装器会建立隔离 Python 环境并运行 Doctor，保存安装与环境报告。以回执 `plugin_installed=true` 确认已安装；不能只看退出码 `2`，因为Mac启动脚本缺Python也用此码且尚未安装。按 DEPENDENCIES.md 补齐环境，不要反复重装或虚报全部就绪；不要再创建独立验证任务。
 5. 安装成功后完全退出并重新打开 Codex，再新建一个普通任务加载新版插件。
 
 已经安装过旧版的用户，使用发送者当前提供的完整邀请链接或单独邀请码执行上述流程，即可升级到邀请包中的最新版。邀请口令轮换后，旧链接不能解密新载荷。

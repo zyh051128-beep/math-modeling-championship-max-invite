@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import subprocess
 import tempfile
 import zipfile
 
@@ -20,7 +21,7 @@ SPEC = importlib.util.spec_from_file_location('maxx_installer', Path(__file__).w
 installer = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(installer)
 
-def verify(install=False, setup_runtime=False):
+def verify(install=False, setup_runtime=False, office_smoke=False):
     code = os.environ.get('MAXX_TEST_INVITE_CODE', '')
     if not code:
         raise RuntimeError('Release test credential is missing; do not replace it with a public value.')
@@ -83,6 +84,17 @@ def verify(install=False, setup_runtime=False):
                           runtime=state.get('runtime_setup'), environment_ready=state.get('environment_ready'))
             if setup_runtime and state.get('runtime_verified') is not True:
                 raise RuntimeError('Plugin installed but extended numerical runtime was not verified.')
+            if office_smoke:
+                runtime = json.loads(Path(state['runtime_report']).read_text(encoding='utf-8'))
+                result_run = subprocess.run([runtime['python'], '-I', str(root / 'ci_docx_smoke.py'),
+                    str(installed / 'plugins' / installer.PLUGIN_NAME / 'skills' / 'math-modeling-championship-maxx'),
+                    str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=240)
+                if result_run.returncode != 0:
+                    raise RuntimeError('Actual LibreOffice DOCX-to-PDF test failed; private logs were suppressed.')
+                receipt = json.loads(result_run.stdout)
+                if receipt.get('status') != 'PASS' or not state.get('environment_ready'):
+                    raise RuntimeError('Word delivery environment was not ready after actual export.')
+                result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'])
             result['boundary'] = 'Real Codex registration and isolated Python setup. Desktop UI, account sign-in and licensed applications are not tested.'
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return result
@@ -91,9 +103,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--install', action='store_true')
     parser.add_argument('--setup-runtime', action='store_true')
+    parser.add_argument('--office-smoke', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.install, args.setup_runtime)
+        verify(args.install, args.setup_runtime, args.office_smoke)
     except Exception as exc:
         # Do not print tracebacks or exception messages from private plugin code.
         print(json.dumps({'status': 'FAIL', 'stage': type(exc).__name__,
