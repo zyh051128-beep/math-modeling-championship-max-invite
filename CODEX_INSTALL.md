@@ -6,7 +6,7 @@
 
 如果安装器指出原始ZIP路径含反斜杠，请不要修改安全校验或改用Windows绕过：从全新目录下载当前包，核对 `payload/SHA256.txt`，旧的失败载荷必须丢弃。每次安装保留仓库提交号、payload摘要、操作系统、插件版本与状态；这些信息可以安全反馈，邀请码不可出现在故障截图/日志中。
 
-2.5 新增：默认完整演练稿目标约60页（55–65页、不采用比赛页数上限），更丰富的证据组合图、原生OMML公式构造与PDF位置审计、摘要两轮改写审计。确认新增 `word_equations.py`、`equation_layout_audit.py`、`abstract_quality_audit.py`、`render_evidence_figures.py` 均随包安装，不需另装技能。Windows自动PDF可用Word或LibreOffice；Mac自动PDF明确使用LibreOffice，不能调用不存在的Windows COM接口。
+2.5 新增：默认完整演练稿正文目标约65页（60–70页，不采用比赛页数上限；摘要、目录、参考文献和附录不计入正文预算），默认目录覆盖实际使用的1–9级标题并用Word原生点引导线和页码。新增 `word_equations.py`、`equation_layout_audit.py`、`abstract_quality_audit.py`、`render_evidence_figures.py` 均随包安装，不需另装技能。目录字段先刷新回可编辑Word，再导出PDF；Windows自动PDF可用Word或LibreOffice，macOS/Linux自动PDF使用LibreOffice。
 
 1. 确认当前消息正文里确实出现完整 URL，包括 `#invite=` 片段；不要只引用上一条消息或截图。发送者还会把同一邀请码单独列一行，链接片段在聊天软件中被截断时使用 `-InviteCode` 备用路线。
 2. 每次安装都从默认分支新建浅克隆，确保拿到仓库当前最新版；禁止复用先前克隆、下载缓存或已解密目录。不要使用 GitHub Raw，也不要要求用户登录 GitHub。以下命令可直接复制（把尖括号占位内容替换成收到的完整值；邀请链接必须保留引号，避免 `#invite=` 被 shell 截断）。
