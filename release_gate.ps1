@@ -23,7 +23,7 @@ function Test-ReleasePython([string]$Candidate) {
         # A filesystem check is insufficient on Windows: the Microsoft Store
         # aliases are real .exe files but return 9009 instead of running Python.
         $ErrorActionPreference = 'Continue'
-        & $Candidate -I -c "import platform,sys;raise SystemExit(0 if platform.python_implementation() == 'CPython' and sys.version_info >= (3, 11) else 2)" *> $null
+        & $Candidate -I -c "import platform,sys; import cryptography; raise SystemExit(0 if platform.python_implementation() == 'CPython' and sys.version_info >= (3, 11) else 2)" *> $null
         return $LASTEXITCODE -eq 0
     }
     catch {
