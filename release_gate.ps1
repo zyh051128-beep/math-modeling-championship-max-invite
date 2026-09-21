@@ -12,6 +12,64 @@ $ErrorActionPreference = 'Stop'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('math-modeling-max-release-' + [guid]::NewGuid().ToString('N'))
 $cloneRoot = Join-Path $testRoot 'anonymous-clone'
 
+function Test-ReleasePython([string]$Candidate) {
+    if ([string]::IsNullOrWhiteSpace($Candidate) -or
+        $Candidate -match '(?i)[\\/]Microsoft[\\/]WindowsApps[\\/]python(?:3)?\.exe$' -or
+        -not (Test-Path -LiteralPath $Candidate -PathType Leaf)) {
+        return $false
+    }
+    $previousErrorAction = $ErrorActionPreference
+    try {
+        # A filesystem check is insufficient on Windows: the Microsoft Store
+        # aliases are real .exe files but return 9009 instead of running Python.
+        $ErrorActionPreference = 'Continue'
+        & $Candidate -I -c "import platform,sys;raise SystemExit(0 if platform.python_implementation() == 'CPython' and sys.version_info >= (3, 11) else 2)" *> $null
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
+}
+
+function Resolve-ReleasePython([string]$ExplicitPath) {
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        if (Test-ReleasePython $ExplicitPath) { return (Resolve-Path -LiteralPath $ExplicitPath).Path }
+        throw 'The supplied -PythonPath is not a runnable CPython 3.11+ interpreter.'
+    }
+
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:MATHMODEL_PYTHON)) {
+        $candidates += $env:MATHMODEL_PYTHON
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidates += Join-Path $env:LOCALAPPDATA 'ShumoMAXx\runtime\venv\Scripts\python.exe'
+        $programsPython = Join-Path $env:LOCALAPPDATA 'Programs\Python'
+        if (Test-Path -LiteralPath $programsPython -PathType Container) {
+            $candidates += Get-ChildItem -LiteralPath $programsPython -Filter python.exe -Recurse -File -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $bundled = Join-Path $env:USERPROFILE '.cache\codex-runtimes'
+        if (Test-Path -LiteralPath $bundled -PathType Container) {
+            $candidates += Get-ChildItem -LiteralPath $bundled -Filter python.exe -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match '\\dependencies\\python\\python\.exe$' } |
+                Select-Object -ExpandProperty FullName
+        }
+    }
+    foreach ($commandName in @('python3', 'python')) {
+        $command = Get-Command $commandName -CommandType Application -ErrorAction SilentlyContinue
+        if ($command) { $candidates += $command.Source }
+    }
+    foreach ($candidate in @($candidates | Select-Object -Unique)) {
+        if (Test-ReleasePython $candidate) { return (Resolve-Path -LiteralPath $candidate).Path }
+    }
+    throw 'Cross-platform release verification requires CPython 3.11+. Install it, set MATHMODEL_PYTHON, or supply -PythonPath.'
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
     $env:GIT_TERMINAL_PROMPT = '0'
@@ -43,14 +101,7 @@ try {
     foreach ($required in @($installerPath, $crossInstallerPath, $crossInstallerTest, $shellInstallerPath)) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw ('A required installer is missing: ' + [IO.Path]::GetFileName($required)) }
     }
-    if ([string]::IsNullOrWhiteSpace($PythonPath)) {
-        $pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
-        if (-not $pythonCommand) { $pythonCommand = Get-Command python -ErrorAction SilentlyContinue }
-        if ($pythonCommand) { $PythonPath = $pythonCommand.Source }
-    }
-    if ([string]::IsNullOrWhiteSpace($PythonPath) -or -not (Test-Path -LiteralPath $PythonPath -PathType Leaf)) {
-        throw 'Cross-platform release verification requires a real Python 3.11+ executable via -PythonPath.'
-    }
+    $PythonPath = Resolve-ReleasePython $PythonPath
     $invitePage = ($RepositoryUrl -replace '\.git$', '') + '#invite=' + [Uri]::EscapeDataString($InviteCode)
     & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -InviteUrl $invitePage -VerifyOnly
     if ($LASTEXITCODE -ne 0) { throw 'The valid invitation code failed verification.' }

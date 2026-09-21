@@ -230,7 +230,7 @@ try {
     New-Item -ItemType Directory -Force -Path $workRoot | Out-Null
     if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {
         $distributionPath = Join-Path $workRoot 'distribution'
-        & git clone --depth 1 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git' $distributionPath
+        & git -c credential.helper= -c core.autocrlf=false clone --depth 1 'https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git' $distributionPath
         if ($LASTEXITCODE -ne 0) { throw 'Unable to clone the public invitation repository. Check GitHub connectivity.' }
         $payloadPath = Join-Path $distributionPath 'payload\plugin-marketplace.aes'
         if (-not (Test-Path -LiteralPath $payloadPath -PathType Leaf)) {

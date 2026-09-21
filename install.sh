@@ -5,7 +5,7 @@ script_dir=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
 python_bin=""
 for candidate in python3 python; do
     if command -v "$candidate" >/dev/null 2>&1 &&
-       "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+       "$candidate" -c 'import platform,sys; raise SystemExit(0 if platform.python_implementation() == "CPython" and sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
         python_bin=$(command -v "$candidate")
         break
     fi
