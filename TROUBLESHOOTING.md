@@ -22,6 +22,12 @@
 
 处理：从全新目录克隆仓库，执行`install.sh --invite-code '<邀请码>' --setup-runtime --runtime-profile extended --delivery both`。安装报告若列出LibreOffice、XeLaTeX、Pandoc、MATLAB或在线账号缺口，按`DEPENDENCIES.md`补齐后重新运行Doctor；插件文件安装成功与外部应用就绪分别记录。
 
+## Selected model is at capacity
+
+这是模型服务容量提示，不是插件压缩包或安装器程序。不要通过反复创建验证任务、切换安装器、降低文件校验或重复安装解决。当前主任务仍能工作时，停止重试失败子代理，直接运行本机工具链。新版随包 `capacity_fallback.py --output <插件目录外的新报告.json>` 可在不调用语言模型的情况下实跑全部仓库回归，结果与源码哈希绑定。
+
+仓库回归不等于具体论文通过复审。题目的求解、摘要、逐页视觉复核及材料包审计仍按插件执行。若当前整个会话也不能工作，保留已完成阶段，使用宿主提供的其他可用模型继续；插件和本地脚本不能解除服务端容量限制。
+
 ## Windows 沙箱程序拒绝访问
 
 症状：插件结果已经显示 `ready: true`、`blocking_failures: []`，但新建的验证任务报告 `codex-windows-sandbox-setup.exe` 被拒绝访问。

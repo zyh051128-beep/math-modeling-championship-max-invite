@@ -142,7 +142,7 @@ Wolfram与SciSpace没有在本插件中嵌入共享账号、API密钥或第三�
 
 ## 6. 受邀者必须完成的验收
 
-2.5 必须能找到 `word_equations.py`、`equation_layout_audit.py`、`abstract_quality_audit.py`、`render_evidence_figures.py` 和 `deep-rehearsal-report.md`。这些只使用已有核心依赖，不额外依赖绘图网站账号。默认演练目标约60页，按实质论证填充；数学结构、导出字形位置、摘要两轮版本链及数据图来源分别核验，不能仅因安装成功就称“所有论文均无错误”。
+2.5 必须能找到 `word_equations.py`、`equation_layout_audit.py`、`abstract_quality_audit.py`、`render_evidence_figures.py` 和 `deep-rehearsal-report.md`。这些只使用已有核心依赖，不额外依赖绘图网站账号。当前默认正文目标60–70页、中心65页，摘要/目录/参考文献/附录不计入；按实质论证填充，不能凑页。另须有 `huawei23_docx.py`、`huawei23_format_audit.py`、`refresh_docx_fields.py`，默认目录展示实际使用的1–9级标题、点引导线及真实页码。数学结构、导出字形位置、摘要两轮版本链及数据图来源分别核验，不能仅因安装成功就称“所有论文均无错误”。
 
 2.4 新增中文总包、Word 原生源稿和真实导出门禁。必须找到 `export_word_pdf.py`、`word_source_audit.py`、`build_delivery_zip.py` 与 `word-delivery-contract.md`。先创建含真实正文、表格和公式的可编辑 DOCX，再用真实 Word 或明确选择的 LibreOffice 导出 PDF；缺排版器就报告该路线未就绪，`python-docx` 不能替代排版程序。导出器会拒绝宏、OLE、DDE 和外部关系（含可点击外链；可先改为纯文本网址），并保留原件、日志及哈希。Windows 本机曾验证真实 Word 路线；LibreOffice 必须在接收者设备另外实测，不得沿用发送者的成功记录。Word 许可证不随邀请共享。
 
@@ -158,6 +158,7 @@ Wolfram与SciSpace没有在本插件中嵌入共享账号、API密钥或第三�
 
 | 现象 | 处理 |
 |---|---|
+| `Selected model is at capacity` | 不是安装包损坏。不重复调起失败子代理；可用主任务直接运行本机脚本。随包 `capacity_fallback.py --output <插件外新报告.json>` 运行全部仓库回归；不调用模型，也不替代真实题目复审。整个会话不可用时切换宿主提供的可用模型继续；不能绕过服务器容量限制 |
 | 邀请链接在聊天/任务记录中丢失或无法解密 | 检查消息是否真的包含 URL 及末尾`#invite=`；若片段被截断，使用发送者同条消息中的单独邀请码。Windows用`-InviteCode`，macOS/Linux用`--invite-code`。从新临时目录重新克隆；不把口令写入公开问题报告或仓库 |
 | macOS提示不能运行Windows安装器 | 改用邀请仓库中的`install.sh`/`install.py`跨平台入口；安装后按报告准备LibreOffice和LaTeX。Mac版Word可人工编辑，自动PDF导出走明确的LibreOffice路线 |
 | 更新后仍加载旧版本 | 保留安装回执，完全退出并重开Codex、新建任务；检查实际加载技能路径/版本。不要反复覆盖正在使用的缓存目录 |

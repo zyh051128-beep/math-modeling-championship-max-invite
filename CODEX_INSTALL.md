@@ -39,4 +39,6 @@
 
 如安装失败，应返回安装器的具体错误与对应补救；不要改用发送者电脑上的本地路径，也不要把“部分可用”描述为全部附加功能已运行。邀请码只用于本次安装命令，不写入公开仓库、报告或工单。附加功能安装说明始终保留在公开仓库，插件未解密成功也能读取。
 
+若看到 `Selected model is at capacity`，按故障说明走“主任务接手、本机脚本回归”的路线，不再反复建立失败子任务。确认新版含 `capacity_fallback.py` 和 `capacity_fallback_test.py`，它们是无模型的工具链测试入口，不是论文审批、模型服务解限或远程自动升级功能。
+
 若安装后缺少 `$math-modeling-championship-maxx` 或华为杯专项审计，判定为旧缓存，必须换新的随机临时目录重新克隆。若 Doctor 已通过但新任务提示 `codex-windows-sandbox-setup.exe` 拒绝访问，按 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 处理，不要把该错误归因于插件安装不完整。
