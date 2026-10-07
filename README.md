@@ -20,13 +20,15 @@
 
 受邀者把**完整邀请链接和单独邀请码以纯文本放在同一条消息中**发送给 Codex，并说：
 
-> 请按仓库 CODEX_INSTALL.md 和 DEPENDENCIES.md 安装或更新“数模-MAXx”。先确认当前消息正文中确有完整 URL；若链接或 `#invite=` 缺失，使用同条消息中的单独邀请码。建立 extended 独立运行环境，以 both 路线检查 Word 与 LaTeX，补齐需要的绘图、排版、PDF 和文献功能，检查 Wolfram/SciSpace 等账号连接，运行 Doctor 与真实功能检查。逐项列出已实跑能力和待我完成的账号/许可证步骤，保存安装报告，最后提示我新建普通任务使用。不要逐个重复安装随包技能。
+> 请按仓库 CODEX_INSTALL.md 和 DEPENDENCIES.md 安装或更新“数模-MAXx”。先确认当前消息正文中确有完整 URL；若链接或 `#invite=` 缺失，使用同条消息中的单独邀请码。保留全部随包技能与程序，建立 extended 独立运行环境，默认以 word 路线检查可编辑 Word 与 PDF 主链；需要 LaTeX 时再补齐依赖并启用 both，不让尚未安装的可选 LaTeX 阻挡主链。补齐需要的绘图、排版、PDF 和文献功能，检查 Wolfram/SciSpace 等账号连接，运行 Doctor 与真实功能检查。逐项列出已实跑能力和待我完成的账号/许可证步骤，保存安装报告，最后提示我新建普通任务使用。不要逐个重复安装随包技能。
 
 其余步骤由 Codex 完成。受邀者不需要登录 GitHub，不需要添加私人仓库权限，不需要逐个安装随包技能，也不需要手工配置插件市场。Windows使用`install.ps1`；macOS/Linux使用`install.sh`（调用标准Python安装器`install.py`）。每次安装或更新必须克隆到新的临时目录，禁止复用旧克隆或旧下载缓存。外部应用如 MATLAB、Word、R、LaTeX、Wolfram、SciSpace 及 Python 第三方库是否可用，仍取决于受邀者本机环境、账号连接与许可。Wolfram 用于公开/脱敏公式的可选交叉核验，SciSpace 用于可选文献发现与回源核验；其流程与离线整理程序随包提供，外部账号不会自动连接。插件会检测并标明 `NOT_RUN` 或替代路线，不虚报零配置、已执行或国奖质量。
 
 ## 交给 Codex 安装
 
 完整附加功能清单、官方安装入口和验证方法见 [DEPENDENCIES.md](DEPENDENCIES.md)。插件运行环境可自动建立；外部应用与账号按这份清单补齐，逐项报告实际状态。
+
+默认命令同时指定 `extended` 与 `word`：前者安装本插件定义的完整核心及扩展 Python 运行库，后者只选择本次交付环境检查范围。全部插件技能、程序和可选应用调用入口都保留，不因选择 `word` 而删减。LaTeX 按需启用：补齐并实测 TeX 等依赖后，将 `-Delivery word` / `--delivery word` 改为 `both`，再检查 Word 与 LaTeX 两条路线。可选应用未安装、未授权或未执行的状态必须如实记录，不能因插件安装成功就标为全部功能已实跑。
 
 收到邀请链接后，把**完整链接**发送给 Codex，并说：
 
@@ -47,9 +49,9 @@ Codex 应执行以下流程（不要使用 `raw.githubusercontent.com`，不要�
 ```powershell
 $folder = Join-Path $env:TEMP ('math-modeling-max-invite-' + [guid]::NewGuid().ToString('N'))
 git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git $folder
-powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteUrl '<粘贴完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery both
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteUrl '<粘贴完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery word
 # 若链接中的 #invite= 被聊天软件截断：
-powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteCode '<粘贴单独邀请码>' -SetupRuntime -RuntimeProfile extended -Delivery both
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $folder 'install.ps1') -InviteCode '<粘贴单独邀请码>' -SetupRuntime -RuntimeProfile extended -Delivery word
 ```
 
 macOS/Linux（Apple Silicon与Intel使用同一入口）：
@@ -57,7 +59,7 @@ macOS/Linux（Apple Silicon与Intel使用同一入口）：
 ```bash
 folder="$(mktemp -d "${TMPDIR:-/tmp}/shumo-maxx-invite.XXXXXX")"
 git clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git "$folder"
-"$folder/install.sh" --invite-code '<粘贴单独邀请码>' --setup-runtime --runtime-profile extended --delivery both
+"$folder/install.sh" --invite-code '<粘贴单独邀请码>' --setup-runtime --runtime-profile extended --delivery word
 ```
 
 跨平台安装器只建立插件和隔离Python环境。macOS的DOCX自动导出需安装并实测LibreOffice；Microsoft Word for Mac可人工编辑和审阅DOCX，但当前自动导出器不调用Mac版Word。LaTeX、MATLAB及在线账号按`DEPENDENCIES.md`逐项准备和验证。

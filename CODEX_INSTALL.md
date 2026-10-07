@@ -6,7 +6,7 @@
 
 收到完整邀请链接后，直接完成以下操作，不要求受邀用户逐项配置：
 
-当前推荐先用 `word` 交付配置打通主链（Python数值/绘图 + 可编辑Word + PDF导出），需要附加LaTeX再启用 `both`。这不删减插件功能，避免把“尚未安装可选LaTeX”误报为“插件无法部署”。在获得安装授权的当前任务内，Codex应代为定位或准备Git、官方Codex CLI、CPython3.11+、免费LibreOffice和合法中文字体；只有确需用户登录、管理员交互、许可或网络条件时才让用户接手。不能承诺这些外部条件随邀请码自动具备。
+默认复制命令使用 `word` 交付配置打通主链（Python数值/绘图 + 可编辑Word + PDF导出），同时通过 `extended` 安装本插件定义的完整核心及扩展 Python 运行库。`word` 只选择本次交付环境检查范围，所有随包插件技能、程序及可选应用调用入口仍完整保留，不裁剪 LaTeX 功能。需要附加 LaTeX 时，先按 DEPENDENCIES.md 补齐并验证 TeX 等依赖，再把 `-Delivery word` / `--delivery word` 改为 `both`，重新检查两条交付路线；未安装可选 LaTeX 不应阻挡 Word/PDF 主链。在获得安装授权的当前任务内，Codex应代为定位或准备Git、官方Codex CLI、CPython3.11+、免费LibreOffice和合法中文字体；只有确需用户登录、管理员交互、许可或网络条件时才让用户接手。不能承诺这些外部条件随邀请码自动具备。
 
 如果安装器指出原始ZIP路径含反斜杠，请不要修改安全校验或改用Windows绕过：从全新目录下载当前包，核对 `payload/SHA256.txt`，旧的失败载荷必须丢弃。每次安装保留仓库提交号、payload摘要、操作系统、插件版本与状态；这些信息可以安全反馈，邀请码不可出现在故障截图/日志中。
 
@@ -20,7 +20,7 @@
    ```powershell
    $maxxClone = Join-Path ([IO.Path]::GetTempPath()) ("maxx-invite-" + [guid]::NewGuid().ToString("N"))
    git -c credential.helper= -c core.autocrlf=false clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git $maxxClone
-   & (Join-Path $maxxClone "install.ps1") -InviteUrl '<完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery both
+   & (Join-Path $maxxClone "install.ps1") -InviteUrl '<完整邀请链接>' -SetupRuntime -RuntimeProfile extended -Delivery word
    ```
 
    macOS/Linux：
@@ -28,10 +28,10 @@
    ```sh
    maxx_clone="$(mktemp -d)/math-modeling-championship-max-invite"
    git -c credential.helper= -c core.autocrlf=false clone --depth 1 https://github.com/zyh051128-beep/math-modeling-championship-max-invite.git "$maxx_clone"
-   "$maxx_clone/install.sh" --invite-url '<完整邀请链接>' --setup-runtime --runtime-profile extended --delivery both
+   "$maxx_clone/install.sh" --invite-url '<完整邀请链接>' --setup-runtime --runtime-profile extended --delivery word
    ```
 
-3. 先阅读 [附加功能安装说明](DEPENDENCIES.md)，定位可运行的 CPython 3.11+（Windows排除 WindowsApps 商店占位程序）。上面的命令是完整功能验收路线；若链接中的 `#invite=` 丢失，Windows把 `-InviteUrl '<完整邀请链接>'` 换成 `-InviteCode '<单独邀请码>'`，macOS/Linux把 `--invite-url '<完整邀请链接>'` 换成 `--invite-code '<单独邀请码>'`。Python不在PATH时，Windows可追加 `-PythonPath '<python.exe绝对路径>'`；macOS/Linux直接用真实解释器绝对路径替换 `<python>` 运行 `<python> "$maxx_clone/install.py" --invite-url '<完整邀请链接>' --setup-runtime --runtime-profile extended --delivery both`。Word仍为必交源稿；macOS/Linux的自动PDF导出使用LibreOffice路线，并分别实测Word/LibreOffice兼容性。
+3. 先阅读 [附加功能安装说明](DEPENDENCIES.md)，定位可运行的 CPython 3.11+（Windows排除 WindowsApps 商店占位程序）。上面的命令安装完整随包功能及 extended 运行库，并先验收 Word/PDF 主链，不代表所有可选外部应用已执行；若链接中的 `#invite=` 丢失，Windows把 `-InviteUrl '<完整邀请链接>'` 换成 `-InviteCode '<单独邀请码>'`，macOS/Linux把 `--invite-url '<完整邀请链接>'` 换成 `--invite-code '<单独邀请码>'`。Python不在PATH时，Windows可追加 `-PythonPath '<python.exe绝对路径>'`；macOS/Linux直接用真实解释器绝对路径替换 `<python>` 运行 `<python> "$maxx_clone/install.py" --invite-url '<完整邀请链接>' --setup-runtime --runtime-profile extended --delivery word`。Word仍为必交源稿；macOS/Linux的自动PDF导出使用LibreOffice路线，并分别实测Word/LibreOffice兼容性。
 4. 安装器负责解密、完整性校验、旧版替换、市场注册和 MAXx 插件安装。不要另外逐个安装 `math-modeling-championship`，它已经内置。
 5. `-SetupRuntime` 会在使用者目录的独立环境安装核心及扩展数值库，保留安装日志、版本和导入检查。它不修改全局 Python，也不安装商业软件或自动取得账号授权。安装器随后在当前会话运行 MAXx Doctor，保存 `installation-state.json` 与 `maxx-install-doctor.json`。
 6. 只有实际安装回执 `installation-state.json` 中 `plugin_installed=true` 才证明插件已注册；不要只看退出码。安装器正常安装流程退出 `0` 表示所选交付路线环境就绪，退出 `2` 表示插件已装而环境未齐；但外层 `install.sh` 在启动前缺Python时也返回 `2`，此时尚未安装。按报告和 DEPENDENCIES.md 补齐，不反复重装。`-VerifyOnly` / `--verify-only` 只核验当前包，不执行安装或证明论文可交付。若Python不在PATH，可直接用真实解释器绝对路径运行 `install.py`。

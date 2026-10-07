@@ -106,10 +106,19 @@ if __name__ == '__main__':
             'did not identify itself as LibreOffice': 'OFFICE_VERSION_IDENTITY',
             'LibreOffice timed out': 'OFFICE_TIMEOUT',
             'LibreOffice did not produce': 'OFFICE_NO_OUTPUT',
+            'LibreOffice did not return its native field-refresh receipt': 'NATIVE_REFRESH_NO_RECEIPT',
+            'LibreOffice native field refresh failed': 'NATIVE_REFRESH_MACRO_FAILED',
+            'LibreOffice native field refresh did not converge': 'NATIVE_REFRESH_NOT_CONVERGED',
             'Exported PDF contains no searchable text': 'PDF_NO_SEARCHABLE_TEXT',
             'TOC cached result': 'TOC_REFRESH_INVALID',
             'Refreshed TOC does not include': 'TOC_LEVELS_MISSING',
         }
         diagnostic = next((label for token, label in known.items() if token in str(exc)), 'UNCLASSIFIED')
-        print(json.dumps({'status':'FAIL', 'diagnostic':diagnostic}))
+        failure = {'status':'FAIL', 'diagnostic':diagnostic}
+        if diagnostic == 'NATIVE_REFRESH_MACRO_FAILED':
+            import re
+            code = re.search(r'Basic error (\d+)', str(exc))
+            if code:
+                failure['basic_error_code'] = int(code.group(1))
+        print(json.dumps(failure))
         raise SystemExit(1)
