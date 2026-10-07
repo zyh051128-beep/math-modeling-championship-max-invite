@@ -44,6 +44,14 @@ MAX_MEMBER_SIZE = 512 * 1024 * 1024
 MAX_TOTAL_SIZE = 2 * 1024 * 1024 * 1024
 
 REQUIRED_PLUGIN_PATHS = (
+    "skills/math-modeling-championship-maxx/scripts/publication_pipeline.py",
+    "skills/math-modeling-championship-maxx/scripts/build_publication_fixture.py",
+    "skills/math-modeling-championship-maxx/scripts/huawei23_docx.py",
+    "skills/math-modeling-championship-maxx/scripts/huawei23_format_audit.py",
+    "skills/math-modeling-championship-maxx/scripts/refresh_docx_fields.py",
+    "skills/math-modeling-championship-maxx/scripts/word_equations.py",
+    "skills/math-modeling-championship-maxx/scripts/equation_layout_audit.py",
+    "skills/math-modeling-championship-maxx/scripts/render_evidence_figures.py",
     ".codex-plugin/plugin.json",
     "skills/math-modeling-championship-maxx/SKILL.md",
     "skills/math-modeling-championship-max/SKILL.md",

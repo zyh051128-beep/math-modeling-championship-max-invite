@@ -301,6 +301,11 @@ try {
     $manifestPath = Join-Path $pluginRoot '.codex-plugin\plugin.json'
     $requiredEntrypoints = @(
         $manifestPath,
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\publication_pipeline.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\build_publication_fixture.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\huawei23_docx.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\huawei23_format_audit.py'),
+        (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\refresh_docx_fields.py'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\SKILL.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-max\SKILL.md'),
         (Join-Path $pluginRoot 'skills\math-modeling-championship-maxx\scripts\huawei_cup_audit.py'),

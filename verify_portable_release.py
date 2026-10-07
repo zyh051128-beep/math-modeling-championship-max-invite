@@ -89,7 +89,7 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                 runtime = json.loads(Path(state['runtime_report']).read_text(encoding='utf-8'))
                 result_run = subprocess.run([runtime['python'], '-I', str(root / 'ci_docx_smoke.py'),
                     str(installed / 'plugins' / installer.PLUGIN_NAME / 'skills' / 'math-modeling-championship-maxx'),
-                    str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=240)
+                    str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=600)
                 if result_run.returncode != 0:
                     try:
                         failure = json.loads(result_run.stdout).get('diagnostic', 'UNCLASSIFIED')
@@ -101,13 +101,18 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                 receipt = json.loads(result_run.stdout)
                 if receipt.get('status') != 'PASS':
                     raise RuntimeError('Actual document conversion did not return a PASS receipt.')
+                if receipt.get('native_toc_refreshed') is not True or receipt.get('toc_levels') != list(range(1, 10)):
+                    raise RuntimeError('Actual all-level contents refresh was not verified.')
                 if not state.get('environment_ready'):
                     doctor = json.loads(Path(state['doctor_report']).read_text(encoding='utf-8'))
                     # Only short identifiers, never paths, private text or logs.
                     blockers = [item if isinstance(item, str) and re.fullmatch(r'[A-Za-z0-9_:.-]{1,160}', item)
                                 else 'REDACTED_DETAIL' for item in doctor.get('blocking_failures', [])]
                     raise RuntimeError('Word delivery environment was not ready after actual export. Blockers: ' + json.dumps(blockers))
-                result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'])
+                result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'],
+                              native_toc_refreshed=receipt.get('native_toc_refreshed') is True,
+                              toc_levels=receipt.get('toc_levels'), native_equations=receipt.get('native_equations'),
+                              three_line_tables=receipt.get('three_line_tables'), pages_rendered=receipt.get('pages_rendered'))
             result['boundary'] = 'Real Codex registration and isolated Python setup. Desktop UI, account sign-in and licensed applications are not tested.'
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return result

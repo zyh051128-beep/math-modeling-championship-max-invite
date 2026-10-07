@@ -76,6 +76,16 @@ def build_marketplace_fixture(root: Path, version: str = "2.4.0+codex.test") -> 
             path.write_text(json.dumps({"name": installer.PLUGIN_NAME, "version": version}), encoding="utf-8")
         else:
             path.write_text("fixture\n", encoding="utf-8")
+    if tuple(int(part) for part in version.split(".")[:2]) >= (2, 5):
+        skill_root = plugin_root / "skills" / "math-modeling-championship-maxx"
+        for folder, names in (
+            ("scripts", ("word_equations.py", "equation_layout_audit.py", "abstract_quality_audit.py", "render_evidence_figures.py")),
+            ("references", ("deep-rehearsal-report.md", "equation-fidelity-contract.md", "abstract-quality-contract.md", "evidence-figure-gallery.md")),
+        ):
+            for name in names:
+                path = skill_root / folder / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("fixture\n", encoding="utf-8")
 
 
 class CredentialTests(unittest.TestCase):
@@ -163,6 +173,10 @@ class ArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / 'fixture'
             build_marketplace_fixture(fixture, version='2.5.0+codex.test')
+            self.assertEqual(installer.verify_extracted_marketplace(fixture)["version"], '2.5.0+codex.test')
+            target = (fixture / 'plugins' / installer.PLUGIN_NAME / 'skills' /
+                      'math-modeling-championship-maxx' / 'scripts' / 'word_equations.py')
+            target.unlink()
             with self.assertRaisesRegex(installer.InstallError, 'word_equations.py'):
                 installer.verify_extracted_marketplace(fixture)
 
