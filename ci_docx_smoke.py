@@ -23,7 +23,7 @@ def find_libreoffice():
             return str(Path(candidate).resolve())
     raise RuntimeError('LibreOffice executable was not found in PATH or standard application folders.')
 
-def run_apmcm(skill_root, root):
+def run_apmcm(skill_root, root, engine='libreoffice'):
     import pymupdf
     root.mkdir()
     team = 'apmcm25999999'
@@ -40,7 +40,9 @@ def run_apmcm(skill_root, root):
     (root / 'sample.py').write_text('print(3 ** 2)\n', encoding='utf-8')
     pipeline = skill_root / 'scripts' / 'publication_pipeline.py'
     command = [sys.executable, str(pipeline), '--project-root', str(root), '--spec', 'spec.json',
-               '--output-dir', 'output', '--engine', 'libreoffice', '--executable', find_libreoffice()]
+               '--output-dir', 'output', '--engine', engine]
+    if engine == 'libreoffice':
+        command.extend(['--executable', find_libreoffice()])
     result = subprocess.run(command, capture_output=True, timeout=540,
                             env={**os.environ, 'PYTHONUTF8': '1'})
     if result.returncode:
