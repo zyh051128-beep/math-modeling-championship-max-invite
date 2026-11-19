@@ -1,5 +1,9 @@
 # 受邀安装故障处理
 
+## Mac 上的 LibreOffice 下载返回 404
+
+先用 `uname -m` 确认处理器。从 LibreOffice 官网选择对应架构的安装包，Apple Silicon 选 aarch64，Intel 选 x86-64。若 Homebrew 使用已下架的下载地址，可从官方归档安装与本次发布测试相同的 26.2.5.2。下载后用 `shasum -a 256` 对照下载详情页的 SHA-256，打开 DMG，将 LibreOffice 拖入“应用程序”。使用 `/Applications/LibreOffice.app/Contents/MacOS/soffice --version` 验证，再运行论文导出。[Apple Silicon 下载详情](https://downloadarchive.documentfoundation.org/libreoffice/old/26.2.5.2/mac/aarch64/LibreOffice_26.2.5.2_MacOS_aarch64.dmg.mirrorlist) · [Intel 下载详情](https://downloadarchive.documentfoundation.org/libreoffice/old/26.2.5.2/mac/x86_64/LibreOffice_26.2.5.2_MacOS_x86-64.dmg.mirrorlist)
+
 ## 仍显示旧版本或旧提交
 
 如果界面仍只显示“MAX”、找不到 `$math-modeling-championship-maxx`，或新建项目使用华为杯规则，检查安装回执版本和 APMCM 规则文件。2.6 起新建项目应使用 `apmcm2025`。已有华为杯项目按其记录的档案继续。

@@ -36,7 +36,32 @@ jobs:
         run: choco install libreoffice-fresh --yes --no-progress
       - name: Prepare free document backend on macOS
         if: runner.os == 'macOS'
-        run: brew install --cask libreoffice
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            arm64)
+              folder=aarch64
+              arch=aarch64
+              digest=c99fb4fe574437fc4cb820a4ca15271bca325920861f7139858b36d7f9df78ad ;;
+            x86_64)
+              folder=x86_64
+              arch=x86-64
+              digest=e26180298685274b54aa7fe6e1101c65465a372f457a6748ebd642720811db36 ;;
+            *) exit 1 ;;
+          esac
+          version=26.2.5.2
+          dir="$(mktemp -d)"
+          dmg="$dir/LibreOffice.dmg"
+          mount="$dir/mount"
+          url="https://downloadarchive.documentfoundation.org/libreoffice/old/$version/mac/$folder/LibreOffice_${version}_MacOS_${arch}.dmg"
+          curl --fail --location --retry 3 "$url" --output "$dmg"
+          printf '%s  %s\n' "$digest" "$dmg" | shasum -a 256 --check
+          mkdir "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg"
+          trap 'hdiutil detach "$mount"' EXIT
+          sudo ditto "$mount/LibreOffice.app" /Applications/LibreOffice.app
+          /Applications/LibreOffice.app/Contents/MacOS/soffice --version
       - name: Prepare free document backend on Linux
         if: runner.os == 'Linux'
         run: |
