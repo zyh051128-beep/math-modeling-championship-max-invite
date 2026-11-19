@@ -42,6 +42,15 @@ PLUGIN_SPEC = f"{PLUGIN_NAME}@{MARKETPLACE_NAME}"
 MAX_ZIP_ENTRIES = 20_000
 MAX_MEMBER_SIZE = 512 * 1024 * 1024
 MAX_TOTAL_SIZE = 2 * 1024 * 1024 * 1024
+APMCM_ENTRYPOINTS = (
+    "scripts/apmcm_paper.py", "scripts/apmcm_submission.py", "scripts/maxx_intake.py",
+    "references/apmcm2025.md", "references/apmcm2025-profile.json",
+)
+APMCM_CORE_ASSETS = {
+    "2025 APMCM Summary Sheet.docx", "2025 APMCM Control Sheet.docx",
+    "2025 APMCM Essay format and submission specifications.pdf",
+    "latex/main.tex", "latex/apmcmthesis.cls", "latex/ControlSheet.tex",
+}
 
 REQUIRED_PLUGIN_PATHS = (
     "skills/math-modeling-championship-maxx/scripts/publication_pipeline.py",
@@ -391,6 +400,23 @@ def verify_extracted_marketplace(root: Path) -> dict[str, str]:
             _assert_regular_file(plugin_root, 'skills/math-modeling-championship-maxx/scripts/' + name)
         for name in ('deep-rehearsal-report.md', 'equation-fidelity-contract.md', 'abstract-quality-contract.md', 'evidence-figure-gallery.md'):
             _assert_regular_file(plugin_root, 'skills/math-modeling-championship-maxx/references/' + name)
+    if release and tuple(map(int, release.groups())) >= (2, 6):
+        skill_root = plugin_root / "skills" / "math-modeling-championship-maxx"
+        for relative in APMCM_ENTRYPOINTS:
+            _assert_regular_file(skill_root, relative)
+        profile_file = skill_root / "references" / "apmcm2025-profile.json"
+        profile = strict_json_bytes(profile_file.read_bytes(), profile_file.name)
+        files = profile.get("files") if isinstance(profile, dict) else None
+        if (not isinstance(files, dict) or profile.get("format_profile") != "apmcm2025"
+                or not APMCM_CORE_ASSETS.issubset(files)):
+            raise InstallError("The APMCM format profile is incomplete.")
+        for name, digest in files.items():
+            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9 ._/-]+", name)
+                    or any(part in {"", ".", ".."} for part in name.split("/"))):
+                raise InstallError("The APMCM profile references an invalid asset path.")
+            source = _assert_regular_file(skill_root / "assets" / "apmcm2025", name)
+            if sha256_path(source) != digest:
+                raise InstallError(f"APMCM reference asset checksum mismatch: {name}")
     return {"version": version, "plugin_root": str(plugin_root), "manifest": str(manifest_path)}
 
 

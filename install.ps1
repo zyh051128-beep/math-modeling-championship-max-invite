@@ -346,6 +346,31 @@ try {
             }
         }
     }
+    if ($version -match '^(\d+)\.(\d+)\.' -and ([int]$Matches[1] -gt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -ge 6))) {
+        $skillPath = Join-Path $pluginRoot 'skills/math-modeling-championship-maxx'
+        foreach ($relative in @('scripts/apmcm_paper.py', 'scripts/apmcm_submission.py', 'scripts/maxx_intake.py', 'references/apmcm2025.md', 'references/apmcm2025-profile.json')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $skillPath $relative) -PathType Leaf)) {
+                throw ('Missing APMCM component: ' + $relative)
+            }
+        }
+        $profilePath = Join-Path $skillPath 'references/apmcm2025-profile.json'
+        $profile = Get-Content -Raw -Encoding UTF8 -LiteralPath $profilePath | ConvertFrom-Json
+        $assetRoot = Join-Path $skillPath 'assets/apmcm2025'
+        if ($profile.format_profile -cne 'apmcm2025' -or -not $profile.files) { throw 'Invalid APMCM profile.' }
+        $assetNames = @($profile.files.PSObject.Properties.Name)
+        foreach ($name in @('2025 APMCM Summary Sheet.docx', '2025 APMCM Control Sheet.docx', '2025 APMCM Essay format and submission specifications.pdf', 'latex/main.tex', 'latex/apmcmthesis.cls', 'latex/ControlSheet.tex')) {
+            if ($assetNames -cnotcontains $name) { throw ('Missing APMCM profile asset: ' + $name) }
+        }
+        foreach ($entry in $profile.files.PSObject.Properties) {
+            if ($entry.Name -cnotmatch '^[A-Za-z0-9 ._/-]+$' -or @($entry.Name.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0) {
+                throw 'Invalid APMCM asset path.'
+            }
+            $asset = Join-Path $assetRoot $entry.Name
+            if (-not (Test-Path -LiteralPath $asset -PathType Leaf) -or (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash -ne $entry.Value) {
+                throw ('Missing or damaged APMCM asset: ' + $entry.Name)
+            }
+        }
+    }
     if ($VerifyOnly) {
         Write-Host ('Invitation package verified (decryption and required files only): Shumo-MAXx ' + $version)
         return

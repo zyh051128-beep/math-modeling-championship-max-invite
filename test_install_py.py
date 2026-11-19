@@ -86,6 +86,20 @@ def build_marketplace_fixture(root: Path, version: str = "2.4.0+codex.test") -> 
                 path = skill_root / folder / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("fixture\n", encoding="utf-8")
+    if tuple(int(part) for part in version.split(".")[:2]) >= (2, 6):
+        skill = plugin_root / "skills" / "math-modeling-championship-maxx"
+        for relative in installer.APMCM_ENTRYPOINTS:
+            path = skill / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("fixture\n", encoding="utf-8")
+        files = {}
+        for name in sorted(installer.APMCM_CORE_ASSETS | {"latex/figures/example.pdf"}):
+            path = skill / "assets" / "apmcm2025" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"synthetic fixture")
+            files[name] = installer.sha256_path(path)
+        (skill / "references" / "apmcm2025-profile.json").write_text(
+            json.dumps({"format_profile": "apmcm2025", "files": files}), encoding="utf-8")
 
 
 class CredentialTests(unittest.TestCase):
@@ -169,6 +183,23 @@ class PayloadTests(unittest.TestCase):
 
 
 class ArchiveTests(unittest.TestCase):
+    def test_apmcm_release_checks_template_and_nested_assets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            build_marketplace_fixture(root, "2.6.0")
+            meta = installer.verify_extracted_marketplace(root)
+            skill = Path(meta["plugin_root"]) / "skills" / "math-modeling-championship-maxx"
+            nested = skill / "assets" / "apmcm2025" / "latex" / "figures" / "example.pdf"
+            nested.write_bytes(b"changed")
+            with self.assertRaisesRegex(installer.InstallError, "checksum mismatch"):
+                installer.verify_extracted_marketplace(root)
+            nested.unlink()
+            with self.assertRaisesRegex(installer.InstallError, "example.pdf"):
+                installer.verify_extracted_marketplace(root)
+            (skill / "scripts" / "apmcm_paper.py").unlink()
+            with self.assertRaisesRegex(installer.InstallError, "apmcm_paper.py"):
+                installer.verify_extracted_marketplace(root)
+
     def test_deep_release_missing_new_components_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / 'fixture'

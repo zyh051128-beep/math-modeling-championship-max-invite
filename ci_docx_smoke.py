@@ -4,8 +4,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
-from docx import Document
 
 def find_libreoffice():
     candidates = [shutil.which('soffice'), shutil.which('libreoffice'),
@@ -22,6 +22,47 @@ def find_libreoffice():
                 return str(console.resolve())
             return str(Path(candidate).resolve())
     raise RuntimeError('LibreOffice executable was not found in PATH or standard application folders.')
+
+def run_apmcm(skill_root, root):
+    import pymupdf
+    root.mkdir()
+    team = 'apmcm25999999'
+    stem = 'A' + team
+    spec = {
+        'problem': 'A', 'team': team, 'title': 'Synthetic deployment sample',
+        'abstract': ['We verify the rendering of an English report from the bundled summary template.'],
+        'body': [{'type': 'heading', 'level': 1, 'text': 'Test method'},
+                 {'type': 'paragraph', 'text': 'We verified the square of three with a short program.'}],
+        'software': ['Python'], 'source_files': ['sample.py'],
+    }
+    # Omit format_profile on purpose: new recipient projects must use APMCM by default.
+    (root / 'spec.json').write_text(json.dumps(spec), encoding='utf-8')
+    (root / 'sample.py').write_text('print(3 ** 2)\n', encoding='utf-8')
+    pipeline = skill_root / 'scripts' / 'publication_pipeline.py'
+    command = [sys.executable, str(pipeline), '--project-root', str(root), '--spec', 'spec.json',
+               '--output-dir', 'output', '--engine', 'libreoffice', '--executable', find_libreoffice()]
+    result = subprocess.run(command, capture_output=True, timeout=540,
+                            env={**os.environ, 'PYTHONUTF8': '1'})
+    if result.returncode:
+        raise RuntimeError('APMCM publication failed.')
+    output = root / 'output'
+    receipt = json.loads((output / 'audit/publication-receipt.json').read_text(encoding='utf-8'))
+    if (receipt.get('format_profile') != 'apmcm2025' or receipt.get('status') != 'PASS'
+            or not (output / (stem + '.docx')).is_file() or not (output / (stem + 'cns-unsigned.docx')).is_file()):
+        raise RuntimeError('APMCM publication receipt invalid.')
+    with pymupdf.open(output / (stem + '.pdf')) as pdf:
+        pages = [''.join(page.get_text().lower().split()) for page in pdf]
+    pagination = receipt['pagination']
+    body_start, appendix_start = pagination['body_start'], pagination['appendix_start']
+    if (len(pages) != receipt['rendering']['page_count'] or len(pages) < 4
+            or 'summarysheet' not in pages[0] or 'contents' not in pages[1]
+            or not 2 < body_start < appendix_start <= len(pages)
+            or 'testmethod' not in pages[body_start - 1] or 'softwareused:' not in pages[appendix_start - 1]
+            or appendix_start - body_start != pagination['body_pages'] or not 1 <= pagination['body_pages'] <= 25):
+        raise RuntimeError('APMCM physical pages differ from expected layout.')
+    return {'apmcm_default_verified': True, 'apmcm_summary_pages': 1,
+            'apmcm_pdf_pages': len(pages), 'apmcm_body_pages': pagination['body_pages']}
+
 
 def run(skill_root, root):
     root.mkdir()
@@ -90,7 +131,8 @@ def run(skill_root, root):
         for page in pdf:
             page.get_pixmap(matrix=pymupdf.Matrix(1, 1), alpha=False)
             rendered += 1
-    print(json.dumps({'status':'PASS','engine':result['engine']['name'],'page_count':result['pdf']['page_count'],
+    apmcm = run_apmcm(skill_root, root / 'apmcm')
+    print(json.dumps({'status':'PASS', **apmcm, 'engine':result['engine']['name'],'page_count':result['pdf']['page_count'],
                       'native_equations':6, 'three_line_tables':1, 'pages_rendered':rendered,
                       'native_toc_refreshed':True, 'toc_levels':toc['toc']['cached_levels'],
                       'boundary':'Synthetic editable DOCX actually converted by LibreOffice; visual fidelity of future papers remains subject to per-formula and per-page audit.'}))
@@ -101,6 +143,9 @@ if __name__ == '__main__':
     except Exception as exc:
         # Only known classifications; never emit private source/tracebacks.
         known = {
+            'APMCM publication failed': 'APMCM_PUBLICATION_FAILED',
+            'APMCM publication receipt invalid': 'APMCM_RECEIPT_INVALID',
+            'APMCM physical pages differ': 'APMCM_PAGINATION_FAILED',
             'LibreOffice executable was not found': 'OFFICE_NOT_FOUND',
             'LibreOffice requires an explicitly supplied': 'ABSOLUTE_EXECUTABLE_REQUIRED',
             'did not identify itself as LibreOffice': 'OFFICE_VERSION_IDENTITY',

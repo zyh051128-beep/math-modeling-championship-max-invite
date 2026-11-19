@@ -23,6 +23,8 @@ installer = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(installer)
 
 def verify(install=False, setup_runtime=False, office_smoke=False):
+    if office_smoke and not (install and setup_runtime):
+        raise RuntimeError('Office tests require both installation and runtime setup.')
     code = os.environ.get('MAXX_TEST_INVITE_CODE', '')
     if not code:
         raise RuntimeError('Release test credential is missing; do not replace it with a public value.')
@@ -41,6 +43,10 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
         destination = Path(temp) / 'checked'
         installer.safe_extract_zip_bytes(plain, destination)
         metadata = installer.verify_extracted_marketplace(destination)
+        # Check release capabilities without pinning a build number or file count.
+        skill = Path(metadata['plugin_root']) / 'skills' / 'math-modeling-championship-maxx'
+        if not all((skill / relative).is_file() for relative in installer.APMCM_ENTRYPOINTS):
+            raise RuntimeError('The portable release is missing APMCM components.')
         actual = {p.relative_to(destination).as_posix(): installer.sha256_path(p)
                   for p in destination.rglob('*') if p.is_file()}
         if actual != expected:
@@ -89,7 +95,7 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                 runtime = json.loads(Path(state['runtime_report']).read_text(encoding='utf-8'))
                 result_run = subprocess.run([runtime['python'], '-I', str(root / 'ci_docx_smoke.py'),
                     str(installed / 'plugins' / installer.PLUGIN_NAME / 'skills' / 'math-modeling-championship-maxx'),
-                    str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=600)
+                    str(Path(temp).resolve() / 'docx-test')], capture_output=True, text=True, encoding='utf-8', timeout=900)
                 if result_run.returncode != 0:
                     try:
                         failure = json.loads(result_run.stdout).get('diagnostic', 'UNCLASSIFIED')
@@ -103,6 +109,11 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                     raise RuntimeError('Actual document conversion did not return a PASS receipt.')
                 if receipt.get('native_toc_refreshed') is not True or receipt.get('toc_levels') != list(range(1, 10)):
                     raise RuntimeError('Actual all-level contents refresh was not verified.')
+                if (receipt.get('apmcm_default_verified') is not True or receipt.get('apmcm_summary_pages') != 1
+                        or type(receipt.get('apmcm_body_pages')) is not int
+                        or not 1 <= receipt['apmcm_body_pages'] <= 25
+                        or type(receipt.get('apmcm_pdf_pages')) is not int or receipt['apmcm_pdf_pages'] < 4):
+                    raise RuntimeError('Default APMCM Summary Sheet and physical PDF pagination were not verified.')
                 if not state.get('environment_ready'):
                     doctor = json.loads(Path(state['doctor_report']).read_text(encoding='utf-8'))
                     # Only short identifiers, never paths, private text or logs.
@@ -110,6 +121,8 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                                 else 'REDACTED_DETAIL' for item in doctor.get('blocking_failures', [])]
                     raise RuntimeError('Word delivery environment was not ready after actual export. Blockers: ' + json.dumps(blockers))
                 result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'],
+                              apmcm_default_verified=True, apmcm_summary_pages=1,
+                              apmcm_body_pages=receipt['apmcm_body_pages'], apmcm_pdf_pages=receipt['apmcm_pdf_pages'],
                               native_toc_refreshed=receipt.get('native_toc_refreshed') is True,
                               toc_levels=receipt.get('toc_levels'), native_equations=receipt.get('native_equations'),
                               three_line_tables=receipt.get('three_line_tables'), pages_rendered=receipt.get('pages_rendered'))

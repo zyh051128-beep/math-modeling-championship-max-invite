@@ -267,7 +267,7 @@ try {
     foreach ($name in @('math-modeling-championship-maxx', 'math-modeling-championship-max', 'math-modeling-championship')) {
         Write-Fixture ($plugin + '\skills\' + $name + '\SKILL.md') ('---' + "`nname: " + $name + "`ndescription: Synthetic installer fixture.`n---`nFixture only.")
     }
-    foreach ($name in @('huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py', 'render_flowcharts.py', 'presentation_audit.py', 'export_word_pdf.py', 'word_source_audit.py', 'build_delivery_zip.py', 'page_budget_audit.py', 'algorithm_verification_audit.py', 'edit_figure_spec.py')) {
+    foreach ($name in @('publication_pipeline.py', 'build_publication_fixture.py', 'huawei23_docx.py', 'huawei23_format_audit.py', 'refresh_docx_fields.py', 'huawei_cup_audit.py', 'evidence_consistency_audit.py', 'ai_content_audit.py', 'scispace_evidence.py', 'render_flowcharts.py', 'presentation_audit.py', 'export_word_pdf.py', 'word_source_audit.py', 'build_delivery_zip.py', 'page_budget_audit.py', 'algorithm_verification_audit.py', 'edit_figure_spec.py')) {
         Write-Fixture ($maxx + '\scripts\' + $name) '# Synthetic required-entrypoint fixture; not a functional model.'
     }
     foreach ($name in @('doctor.py', 'state_manager.py')) {
