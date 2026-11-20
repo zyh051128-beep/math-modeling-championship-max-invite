@@ -51,6 +51,8 @@ APMCM_CORE_ASSETS = {
     "2025 APMCM Essay format and submission specifications.pdf",
     "latex/main.tex", "latex/apmcmthesis.cls", "latex/ControlSheet.tex",
 }
+APMCM_2026_ENTRYPOINTS = ("references/apmcm2026.md", "references/apmcm2026-profile.json")
+APMCM_2026_ASSETS = {"official-rules.pdf", "registration-notice.pdf", "ai-rules.txt"}
 
 REQUIRED_PLUGIN_PATHS = (
     "skills/math-modeling-championship-maxx/scripts/publication_pipeline.py",
@@ -371,6 +373,22 @@ def _assert_regular_file(root: Path, relative: str) -> Path:
     return path
 
 
+def verify_apmcm_assets(skill_root: Path, profile_name: str, expected_names: set[str]) -> None:
+    profile_file = _assert_regular_file(skill_root, f"references/{profile_name}-profile.json")
+    profile = strict_json_bytes(profile_file.read_bytes(), profile_file.name)
+    files = profile.get("files") if isinstance(profile, dict) else None
+    if (not isinstance(files, dict) or profile.get("format_profile") != profile_name
+            or not expected_names.issubset(files)):
+        raise InstallError(f"The {profile_name} format profile is incomplete.")
+    for name, digest in files.items():
+        if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9 ._/-]+", name)
+                or any(part in {"", ".", ".."} for part in name.split("/"))):
+            raise InstallError("The APMCM profile references an invalid asset path.")
+        source = _assert_regular_file(skill_root / "assets" / profile_name, name)
+        if sha256_path(source) != digest:
+            raise InstallError(f"APMCM reference asset checksum mismatch: {name}")
+
+
 def verify_extracted_marketplace(root: Path) -> dict[str, str]:
     marketplace_path = _assert_regular_file(root, ".agents/plugins/marketplace.json")
     marketplace = strict_json_bytes(marketplace_path.read_bytes(), "marketplace.json")
@@ -404,19 +422,11 @@ def verify_extracted_marketplace(root: Path) -> dict[str, str]:
         skill_root = plugin_root / "skills" / "math-modeling-championship-maxx"
         for relative in APMCM_ENTRYPOINTS:
             _assert_regular_file(skill_root, relative)
-        profile_file = skill_root / "references" / "apmcm2025-profile.json"
-        profile = strict_json_bytes(profile_file.read_bytes(), profile_file.name)
-        files = profile.get("files") if isinstance(profile, dict) else None
-        if (not isinstance(files, dict) or profile.get("format_profile") != "apmcm2025"
-                or not APMCM_CORE_ASSETS.issubset(files)):
-            raise InstallError("The APMCM format profile is incomplete.")
-        for name, digest in files.items():
-            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9 ._/-]+", name)
-                    or any(part in {"", ".", ".."} for part in name.split("/"))):
-                raise InstallError("The APMCM profile references an invalid asset path.")
-            source = _assert_regular_file(skill_root / "assets" / "apmcm2025", name)
-            if sha256_path(source) != digest:
-                raise InstallError(f"APMCM reference asset checksum mismatch: {name}")
+        verify_apmcm_assets(skill_root, "apmcm2025", APMCM_CORE_ASSETS)
+        if tuple(map(int, release.groups())) >= (2, 7):
+            for relative in APMCM_2026_ENTRYPOINTS:
+                _assert_regular_file(skill_root, relative)
+            verify_apmcm_assets(skill_root, "apmcm2026", APMCM_2026_ASSETS)
     return {"version": version, "plugin_root": str(plugin_root), "manifest": str(manifest_path)}
 
 

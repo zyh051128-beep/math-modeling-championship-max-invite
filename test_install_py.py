@@ -100,6 +100,17 @@ def build_marketplace_fixture(root: Path, version: str = "2.4.0+codex.test") -> 
             files[name] = installer.sha256_path(path)
         (skill / "references" / "apmcm2025-profile.json").write_text(
             json.dumps({"format_profile": "apmcm2025", "files": files}), encoding="utf-8")
+    if tuple(int(part) for part in version.split(".")[:2]) >= (2, 7):
+        base = skill / "assets" / "apmcm2026"
+        base.mkdir(parents=True)
+        files = {}
+        for name in installer.APMCM_2026_ASSETS:
+            target = base / name
+            target.write_bytes(b"APMCM 2026 fixture")
+            files[name] = installer.sha256_path(target)
+        (skill / "references" / "apmcm2026.md").write_text("fixture", encoding="utf-8")
+        (skill / "references" / "apmcm2026-profile.json").write_text(
+            json.dumps({"format_profile": "apmcm2026", "files": files}), encoding="utf-8")
 
 
 class CredentialTests(unittest.TestCase):
@@ -183,6 +194,20 @@ class PayloadTests(unittest.TestCase):
 
 
 class ArchiveTests(unittest.TestCase):
+    def test_2026_release_requires_rules_sources_and_guide(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            build_marketplace_fixture(root, "2.7.0")
+            meta = installer.verify_extracted_marketplace(root)
+            skill = Path(meta["plugin_root"]) / "skills" / "math-modeling-championship-maxx"
+            source = skill / "assets" / "apmcm2026" / "official-rules.pdf"
+            source.write_bytes(b"modified rules")
+            with self.assertRaisesRegex(installer.InstallError, "checksum mismatch"):
+                installer.verify_extracted_marketplace(root)
+            (skill / "references" / "apmcm2026.md").unlink()
+            with self.assertRaisesRegex(installer.InstallError, "apmcm2026.md"):
+                installer.verify_extracted_marketplace(root)
+
     def test_apmcm_release_checks_template_and_nested_assets(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

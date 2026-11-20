@@ -353,21 +353,31 @@ try {
                 throw ('Missing APMCM component: ' + $relative)
             }
         }
-        $profilePath = Join-Path $skillPath 'references/apmcm2025-profile.json'
-        $profile = Get-Content -Raw -Encoding UTF8 -LiteralPath $profilePath | ConvertFrom-Json
-        $assetRoot = Join-Path $skillPath 'assets/apmcm2025'
-        if ($profile.format_profile -cne 'apmcm2025' -or -not $profile.files) { throw 'Invalid APMCM profile.' }
-        $assetNames = @($profile.files.PSObject.Properties.Name)
-        foreach ($name in @('2025 APMCM Summary Sheet.docx', '2025 APMCM Control Sheet.docx', '2025 APMCM Essay format and submission specifications.pdf', 'latex/main.tex', 'latex/apmcmthesis.cls', 'latex/ControlSheet.tex')) {
-            if ($assetNames -cnotcontains $name) { throw ('Missing APMCM profile asset: ' + $name) }
+        $profiles = [ordered]@{
+            apmcm2025 = @('2025 APMCM Summary Sheet.docx', '2025 APMCM Control Sheet.docx', '2025 APMCM Essay format and submission specifications.pdf', 'latex/main.tex', 'latex/apmcmthesis.cls', 'latex/ControlSheet.tex')
         }
-        foreach ($entry in $profile.files.PSObject.Properties) {
-            if ($entry.Name -cnotmatch '^[A-Za-z0-9 ._/-]+$' -or @($entry.Name.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0) {
-                throw 'Invalid APMCM asset path.'
+        if ([int]$Matches[1] -gt 2 -or [int]$Matches[2] -ge 7) {
+            $profiles['apmcm2026'] = @('official-rules.pdf', 'registration-notice.pdf', 'ai-rules.txt')
+        }
+        foreach ($profileName in $profiles.Keys) {
+            $guide = Join-Path $skillPath ('references/' + $profileName + '.md')
+            if (-not (Test-Path -LiteralPath $guide -PathType Leaf)) { throw ('Missing APMCM guide: ' + $profileName) }
+            $profilePath = Join-Path $skillPath ('references/' + $profileName + '-profile.json')
+            $profile = Get-Content -Raw -Encoding UTF8 -LiteralPath $profilePath | ConvertFrom-Json
+            $assetRoot = Join-Path $skillPath ('assets/' + $profileName)
+            if ($profile.format_profile -cne $profileName -or -not $profile.files) { throw 'Invalid APMCM profile.' }
+            $assetNames = @($profile.files.PSObject.Properties.Name)
+            foreach ($name in $profiles[$profileName]) {
+                if ($assetNames -cnotcontains $name) { throw ('Missing APMCM profile asset: ' + $name) }
             }
-            $asset = Join-Path $assetRoot $entry.Name
-            if (-not (Test-Path -LiteralPath $asset -PathType Leaf) -or (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash -ne $entry.Value) {
-                throw ('Missing or damaged APMCM asset: ' + $entry.Name)
+            foreach ($entry in $profile.files.PSObject.Properties) {
+                if ($entry.Name -cnotmatch '^[A-Za-z0-9 ._/-]+$' -or @($entry.Name.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0) {
+                    throw 'Invalid APMCM asset path.'
+                }
+                $asset = Join-Path $assetRoot $entry.Name
+                if (-not (Test-Path -LiteralPath $asset -PathType Leaf) -or (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash -ne $entry.Value) {
+                    throw ('Missing or damaged APMCM asset: ' + $entry.Name)
+                }
             }
         }
     }

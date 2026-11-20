@@ -1,6 +1,6 @@
 # 数模-MAXx：受邀者安装与完整能力接通说明
 
-适用于受邀者自己的 Codex、电脑和账号。自 2.6 起，新项目默认采用上传的 2025 APMCM 提交规范、英文摘要模板和独立承诺书。摘要优先一页，第 2 页开始目录，正文目标 22–24 页、最多 25 页，附录不限。对应验收入口为 `publication_pipeline.py` 与 `apmcm_submission.py`，详见 [APMCM 格式规范](apmcm2025.md)。下文涉及旧比赛名称的历史能力仅适用于显式选择该竞赛的项目。
+2.7 新项目采用 2026 APMCM 英文赛演练标准。摘要在首页，正文写作目标 22–24 页，最多 25 页为演练设置。安装完成后用 publication_pipeline.py 导出 PDF，再以 apmcm_submission.py 检查。2025 已有项目按原档案恢复。[组委会参赛规则](https://www.apmcm.org/detail/2513) · [AI 专项通知](https://m.saikr.com/contest/notice_detail/50212)
 
 本次赛后修复新增统一入口 `publication_pipeline.py`、原生行内公式和哈希绑定图片、积分/连乘/极限/函数/括号/分段函数，以及六类数据组合图的源规格编辑重绘。安装器应核对这些入口存在，再用 `build_publication_fixture.py` 和 `build_evidence_figure_gallery.py --with-edit-demo` 在接收者环境实跑。执行回执与逐页视觉复核是不同检查，不能仅用发现文件代替功能验收。
 

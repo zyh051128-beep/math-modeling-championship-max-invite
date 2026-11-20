@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -26,11 +27,11 @@ def find_libreoffice():
 def run_apmcm(skill_root, root, engine='libreoffice'):
     import pymupdf
     root.mkdir()
-    team = 'apmcm25999999'
+    team = 'apmcm26999999'
     stem = 'A' + team
     spec = {
         'problem': 'A', 'team': team, 'title': 'Synthetic deployment sample',
-        'abstract': ['We verify the rendering of an English report from the bundled summary template.'],
+        'abstract': ['We verify the rendering of an English APMCM rehearsal report.'],
         'body': [{'type': 'heading', 'level': 1, 'text': 'Test method'},
                  {'type': 'paragraph', 'text': 'We verified the square of three with a short program.'}],
         'software': ['Python'], 'source_files': ['sample.py'],
@@ -49,20 +50,28 @@ def run_apmcm(skill_root, root, engine='libreoffice'):
         raise RuntimeError('APMCM publication failed.')
     output = root / 'output'
     receipt = json.loads((output / 'audit/publication-receipt.json').read_text(encoding='utf-8'))
-    if (receipt.get('format_profile') != 'apmcm2025' or receipt.get('status') != 'PASS'
-            or not (output / (stem + '.docx')).is_file() or not (output / (stem + 'cns-unsigned.docx')).is_file()):
+    if (receipt.get('format_profile') != 'apmcm2026' or receipt.get('status') != 'PASS'
+            or not (output / (stem + '.docx')).is_file()
+            or not (output / (stem + '-rehearsal-control-checklist.docx')).is_file()):
         raise RuntimeError('APMCM publication receipt invalid.')
     with pymupdf.open(output / (stem + '.pdf')) as pdf:
         pages = [''.join(page.get_text().lower().split()) for page in pdf]
+        for index, page in enumerate(pdf, start=1):
+            bounds = page.rect
+            header = page.get_text(clip=pymupdf.Rect(bounds.x0, bounds.y0, bounds.x1, bounds.y0 + 90), sort=True)
+            compact = ''.join(header.lower().split())
+            if not re.match(rf'team#{re.escape(team)}page{index}of{len(pdf)}(?!\d)', compact):
+                raise RuntimeError('APMCM PDF team header or pagination is incorrect.')
     pagination = receipt['pagination']
     body_start, appendix_start = pagination['body_start'], pagination['appendix_start']
     if (len(pages) != receipt['rendering']['page_count'] or len(pages) < 4
-            or 'summarysheet' not in pages[0] or 'contents' not in pages[1]
+            or '2026apmcmsummarysheet' not in pages[0] or 'contents' not in pages[1]
             or not 2 < body_start < appendix_start <= len(pages)
             or 'testmethod' not in pages[body_start - 1] or 'softwareused:' not in pages[appendix_start - 1]
             or appendix_start - body_start != pagination['body_pages'] or not 1 <= pagination['body_pages'] <= 25):
         raise RuntimeError('APMCM physical pages differ from expected layout.')
-    return {'apmcm_default_verified': True, 'apmcm_summary_pages': 1,
+    return {'apmcm_default_verified': True, 'apmcm_format_profile': receipt['format_profile'],
+            'apmcm_team_header_verified': True, 'apmcm_summary_pages': 1,
             'apmcm_pdf_pages': len(pages), 'apmcm_body_pages': pagination['body_pages']}
 
 
@@ -148,6 +157,7 @@ if __name__ == '__main__':
             'APMCM publication failed': 'APMCM_PUBLICATION_FAILED',
             'APMCM publication receipt invalid': 'APMCM_RECEIPT_INVALID',
             'APMCM physical pages differ': 'APMCM_PAGINATION_FAILED',
+            'APMCM PDF team header': 'APMCM_HEADER_FAILED',
             'LibreOffice executable was not found': 'OFFICE_NOT_FOUND',
             'LibreOffice requires an explicitly supplied': 'ABSOLUTE_EXECUTABLE_REQUIRED',
             'did not identify itself as LibreOffice': 'OFFICE_VERSION_IDENTITY',
@@ -163,7 +173,6 @@ if __name__ == '__main__':
         diagnostic = next((label for token, label in known.items() if token in str(exc)), 'UNCLASSIFIED')
         failure = {'status':'FAIL', 'diagnostic':diagnostic}
         if diagnostic == 'NATIVE_REFRESH_MACRO_FAILED':
-            import re
             code = re.search(r'Basic error (\d+)', str(exc))
             if code:
                 failure['basic_error_code'] = int(code.group(1))

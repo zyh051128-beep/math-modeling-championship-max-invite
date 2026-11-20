@@ -29,7 +29,7 @@ sh "$maxx_clone/install.sh" --invite-url '<完整邀请链接>' --setup-runtime 
 
 1. 安装器核验加密包、邀请、插件文件及 APMCM 原件，再向 Codex 注册市场和插件。使用同一邀请市场时可更新旧安装。检查安装回执 `installation-state.json` 的 `plugin_installed`、版本及环境状态，并查看 Doctor 报告。单独执行 `--verify-only` 或 `-VerifyOnly` 只核验包。安装之后退出码 2 表示所选运行环境尚待补齐；shell 启动器找不到 Python 时也可能返回 2，须结合回执判断。
 2. 按附加功能安装说明准备 Git、Codex CLI、CPython 和选用的 Office 后端。需要 LaTeX 时补齐 TeX 依赖并改用 `both` 验收。按题目需要实测绘图、外部程序或文献服务，记录已运行项目和缺失的授权。[附加功能安装说明](DEPENDENCIES.md)
-3. 重新打开 Codex 并新建对话，调用 `$math-modeling-championship-maxx`。新项目档案应为 `apmcm2025`，从随包规范和 Summary Sheet 开始。已有项目可根据其原有竞赛档案继续。
-4. 需要核验本机文档后端时，在空项目使用英文合成材料执行随包 `publication_pipeline.py`，检查首页 Summary Sheet、第二页目录、各页队号和页码、单独的待签承诺书以及实际导出的 PDF。部署回执与实际论文审查分别记录。赛题交付时运行 `apmcm_submission.py`，填写必要的人工复核项目。
+3. 安装 2.7 或更新版本后，重新打开 Codex 并新建对话，调用 `$math-modeling-championship-maxx`。新建英文赛演练应使用 `apmcm2026`，历史项目可使用已记录的 `apmcm2025` 或华为杯档案。
+4. 在空项目中用英文合成材料运行随包 `publication_pipeline.py`，省略 `format_profile`。检查回执中的 `format_profile` 为 `apmcm2026`，打开实际导出的 PDF，核对首页英文摘要、演练版第二页目录、每页页眉的完整队号和对应页码。输出还包括可编辑 Word 和单独的演练核对清单。正式承诺书随当届赛题发布。交付材料时运行 `apmcm_submission.py`，逐项填写人工复核结果。[2026 英文赛规则](https://www.apmcm.org/detail/2513)
 
 安装或导出遇到故障时，保留报错分类、插件版本和使用的 Office 后端，在当前对话继续修复。模型容量不足时可使用本机脚本完成确定性检查。[常见问题](TROUBLESHOOTING.md)

@@ -110,6 +110,8 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                 if receipt.get('native_toc_refreshed') is not True or receipt.get('toc_levels') != list(range(1, 10)):
                     raise RuntimeError('Actual all-level contents refresh was not verified.')
                 if (receipt.get('apmcm_default_verified') is not True or receipt.get('apmcm_summary_pages') != 1
+                        or receipt.get('apmcm_format_profile') != 'apmcm2026'
+                        or receipt.get('apmcm_team_header_verified') is not True
                         or type(receipt.get('apmcm_body_pages')) is not int
                         or not 1 <= receipt['apmcm_body_pages'] <= 25
                         or type(receipt.get('apmcm_pdf_pages')) is not int or receipt['apmcm_pdf_pages'] < 4):
@@ -121,7 +123,8 @@ def verify(install=False, setup_runtime=False, office_smoke=False):
                                 else 'REDACTED_DETAIL' for item in doctor.get('blocking_failures', [])]
                     raise RuntimeError('Word delivery environment was not ready after actual export. Blockers: ' + json.dumps(blockers))
                 result.update(actual_docx_pdf_export='PASS', office_engine=receipt['engine'],
-                              apmcm_default_verified=True, apmcm_summary_pages=1,
+                              apmcm_default_verified=True, apmcm_format_profile=receipt['apmcm_format_profile'],
+                              apmcm_team_header_verified=True, apmcm_summary_pages=1,
                               apmcm_body_pages=receipt['apmcm_body_pages'], apmcm_pdf_pages=receipt['apmcm_pdf_pages'],
                               native_toc_refreshed=receipt.get('native_toc_refreshed') is True,
                               toc_levels=receipt.get('toc_levels'), native_equations=receipt.get('native_equations'),
