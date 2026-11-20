@@ -72,6 +72,17 @@ $marketplacePath = Join-Path $sourceResolved '.agents\plugins\marketplace.json'
 
 & (Join-Path $root 'parity_gate.ps1') -CanonicalPluginRoot $canonicalResolved -InvitePluginRoot $invitePluginRoot
 
+# Validate the actual staged vendor content against its independent release lock.
+# Source and staging can agree even when a checkout has changed both copies.
+$vendorAudit = Join-Path $invitePluginRoot 'skills\math-modeling-championship-maxx\scripts\third_party_audit.py'
+$python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($python) {
+    & $python.Source -I $vendorAudit --plugin-root $invitePluginRoot
+} else {
+    & py -3 -I $vendorAudit --plugin-root $invitePluginRoot
+}
+if ($LASTEXITCODE -ne 0) { throw 'Staged third-party components differ from the pinned release lock.' }
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 if (Test-Path -LiteralPath $zip) {
     [IO.File]::Delete([IO.Path]::GetFullPath($zip))

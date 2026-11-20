@@ -59,8 +59,8 @@ def run_apmcm(skill_root, root, engine='libreoffice'):
         for index, page in enumerate(pdf, start=1):
             bounds = page.rect
             header = page.get_text(clip=pymupdf.Rect(bounds.x0, bounds.y0, bounds.x1, bounds.y0 + 90), sort=True)
-            compact = ''.join(header.lower().split())
-            if not re.match(rf'team#{re.escape(team)}page{index}of{len(pdf)}(?!\d)', compact):
+            pattern = rf'Team\s*#\s*{re.escape(team)}\s*Page\s*{index}\s*of\s*{len(pdf)}\b'
+            if not re.match(pattern, header.lstrip(), re.IGNORECASE):
                 raise RuntimeError('APMCM PDF team header or pagination is incorrect.')
     pagination = receipt['pagination']
     body_start, appendix_start = pagination['body_start'], pagination['appendix_start']
