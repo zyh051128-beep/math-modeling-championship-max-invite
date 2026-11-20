@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>数模-MAXx · 免邀请码安装</title>
+<style>
+:root{font:16px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#152e36;background:#f2f6f5}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px 14px}
+main{width:min(700px,100%);background:white;border:1px solid #ccdad7;border-radius:18px;padding:clamp(24px,5vw,54px);box-shadow:0 8px 32px #20443d0c}
+h1{margin:0;font-size:clamp(29px,5vw,42px);letter-spacing:-.04em;line-height:1.22}
+h2{font-size:21px;margin:28px 0 8px}p{margin:10px 0}ol{padding-left:1.3em;margin:0}li{margin:.6em 0}
+button{background:#006d61;color:white;font:inherit;font-weight:680;border:0;border-radius:8px;padding:10px 21px;margin-top:14px;cursor:pointer}
+button:disabled{background:#586b69;cursor:default}button:focus-visible{outline:3px solid #d6812a;outline-offset:3px}
+#status{min-height:1.5em;color:#405c57;font-size:.94rem}#status[data-error]{color:#9a281e}
+pre{padding:12px;background:#eff4f3;border-radius:6px;font-size:.88rem;overflow:auto;line-height:1.8}
+details{margin-top:26px;color:#526562;font-size:.86rem} #checksum{overflow-wrap:anywhere}
+</style>
+<main data-sha="9eb08b0f8fb1b146c72a926014ccf8dbab58c799a21bd423b950d411e0091ded" data-size="6679297" data-version="2.7.2">
+<h1>数模-MAXx</h1>
+<p>版本 2.7.2 · Windows 和 macOS · 6.7 MB</p>
+<button id="download" type="button" disabled>下载安装包</button>
+<p id="status" role="status" aria-live="polite">正在检查分享链接…</p>
+<noscript>请开启 JavaScript，以便浏览器读取并校验安装包。</noscript>
+<h2>安装到 Codex</h2>
+<ol>
+<li>完整解压 ZIP，进入含有《安装说明》的 <code>maxx-share</code> 目录。</li>
+<li>用已安装 Codex CLI 的 PowerShell 或终端在此目录执行
+<pre><code>codex plugin marketplace add .
+codex plugin add math-modeling-championship-max@maxx-share
+codex plugin list --marketplace maxx-share</code></pre></li>
+<li>看到插件已启用后，重新打开 Codex，在新对话输入 <code>$math-modeling-championship-maxx</code>。</li>
+</ol>
+<details><summary>安装包 SHA-256 校验值</summary><code id="checksum">9eb08b0f8fb1b146c72a926014ccf8dbab58c799a21bd423b950d411e0091ded</code></details>
+</main>
+<script defer src="./app.js"></script>
+</html>
