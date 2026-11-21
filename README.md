@@ -1,6 +1,6 @@
 # 数模-MAXx 邀请安装与更新
 
-数模-MAXx 2.7 起，新建项目默认使用 2026 年第十六届 APMCM 英文赛规则。安装包收录当届竞赛规则、报名通知和 AI 工具规定摘要，安装时逐文件校验。2025 英文赛模板继续供历史项目使用。[2026 竞赛规则](https://www.apmcm.org/detail/2513) · [2026 AI 工具规定](https://m.saikr.com/contest/notice_detail/50212)
+数模-MAXx 2.8 新建项目默认使用 2026 年第十六届 APMCM 英文赛规则。安装包收录当届规则、报名通知、AI 工具规定摘要和往届论文的逐页研读索引。写作和复审可按题目选择范例，回到 PDF 核对队号、证据、图表和出处。2025 英文赛模板继续供历史项目使用。[2026 竞赛规则](https://www.apmcm.org/detail/2513) · [2026 AI 工具规定](https://m.saikr.com/contest/notice_detail/50212)
 
 ## 接受邀请
 
