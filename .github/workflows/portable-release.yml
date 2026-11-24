@@ -33,7 +33,26 @@ jobs:
         run: python -I test_install_py.py
       - name: Prepare free document backend on Windows
         if: runner.os == 'Windows'
-        run: choco install libreoffice-fresh --yes --no-progress
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $asset = 'https://downloadarchive.documentfoundation.org/libreoffice/old/26.2.5.2/win/x86_64/LibreOffice_26.2.5.2_Win_x86-64.msi'
+          $expected = 'f15ba07bfcb0186986cf3171063506f5d207c11f8cc051ba0d135209e9e915f9'
+          $msi = Join-Path $env:RUNNER_TEMP 'LibreOffice_26.2.5.2_Win_x86-64.msi'
+          curl.exe --fail --location --retry 3 --retry-all-errors --connect-timeout 25 --max-time 360 --output $msi $asset
+          if ($LASTEXITCODE -ne 0) { throw 'LibreOffice download failed.' }
+          if ((Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash -ne $expected) {
+            throw 'LibreOffice installer digest mismatch.'
+          }
+          $install = Start-Process -FilePath msiexec.exe -ArgumentList @('/i', ('"' + $msi + '"'), '/qn', '/norestart') -Wait -PassThru -WindowStyle Hidden
+          if ($install.ExitCode -notin 0,3010) { throw "LibreOffice installation returned $($install.ExitCode)." }
+          $office = Join-Path $env:ProgramFiles 'LibreOffice/program/soffice.com'
+          if (-not (Test-Path -LiteralPath $office -PathType Leaf)) { throw 'Installed Office executable is missing.' }
+          $version = & $office --version
+          if ($LASTEXITCODE -ne 0 -or ($version -join ' ') -notmatch 'LibreOffice 26\.2\.5\.2\b') {
+            throw 'Installed LibreOffice version failed verification.'
+          }
+          Write-Output $version
       - name: Prepare free document backend on macOS
         if: runner.os == 'macOS'
         shell: bash
